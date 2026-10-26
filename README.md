@@ -64,3 +64,31 @@ Puede ejecutar scripts ante eventos, por ejemplo al modificar una identidad. Es 
 Lo que IDM no hace en tu diseño: manejar roles, permisos ni empresas. El OIDM lo dice explícitamente: en el banco, IDM se usa solo para la identidad, y la seguridad basada en roles la maneja otra aplicación, que en BELC es BackOffice.
 Para la frase que te di antes: cuando decimos "ForgeRock autentica", el que autentica es AM, y la ficha de la persona que usa para hacerlo la administra IDM.
 
+-- Бизнес-параметры, доступные для редактирования через бэк-офис
+-- («Экран настройки параметров» в рамках этапа R1).
+-- Если id_grupo_economico равно NULL, используется общее значение; если задано конкретное значение, оно переопределяет общее значение для данной группы.
+CREATE TABLE Configuration_Parameter (
+  id_parametro INT NOT NULL AUTO_INCREMENT,
+  Code VARCHAR(50) NOT NULL,
+  Description VARCHAR(200) NOT NULL,
+  Data_type VARCHAR(10) NOT NULL,
+  Value VARCHAR(100) NOT NULL,
+  id_grupo_economico INT NULL,
+  Status VARCHAR(10) NOT NULL DEFAULT 'ACTIVE',
+  Modified_by VARCHAR(80) NULL,
+  Modification_date DATETIME(3) NULL ON UPDATE CURRENT_TIMESTAMP(3),
+  Version INT NOT NULL DEFAULT 1,
+  -- В MySQL ограничение UNIQUE допускает наличие нескольких значений NULL; для корректной работы используется вычисляемый столбец
+  group_key INT GENERATED ALWAYS AS (IFNULL(id_grupo_economico, 0)) STORED,
+  CONSTRAINT pk_parametro PRIMARY KEY (id_parametro),
+  CONSTRAINT uq_parametro UNIQUE (Code, group_key),
+  CONSTRAINT ck_parametro_tipo CHECK (Data_type IN ('INTEGER','DECIMAL','TEXT','BOOLEAN')),
+  CONSTRAINT ck_parametro_estado CHECK (Status IN ('ACTIVE','INACTIVE')),
+  CONSTRAINT fk_parametro_grupo FOREIGN KEY (id_grupo_economico)
+    REFERENCES Economic_Group (id_grupo_economico)
+) ENGINE = InnoDB DEFAULT CHARACTER SET = utf8mb4; INSERT INTO Parametro_configuracion (Codigo, Descripcion, Tipo_dato, Valor) VALUES
+  ('AFIL_HORAS_EXPIRACION', 'Срок действия приглашения (в часах)', 'INTEGER', '72'),
+  ('AFIL_MAX_REENVIOS', 'Максимальное количество повторных отправок приглашения', 'INTEGER', '3'),
+  ('APR_ADM_HORAS_EXPIRACION', 'Срок действия административного одобрения (в часах)', 'INTEGER', '48');
+-- Предлагаемые начальные значения; в дальнейшем их можно изменить через панель администратора (back office).
+
