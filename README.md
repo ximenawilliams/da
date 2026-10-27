@@ -1,3 +1,31 @@
+🟢 HU-01 · Consultar catálogo · GET /v1/catalogos/{tipo}
+Como pantalla de BELC, quiero los valores de un catálogo para llenar las listas desplegables.
+
+Catálogos: tipos-documento, monedas, tipos-transaccion, perfiles, permisos, tipos-visualizacion, tipos-producto.
+
+Criterios:
+
+Devuelve código y nombre, solo de los valores con estado ACTIVO. permisos devuelve además su categoría.
+Un {tipo} que no está en la lista responde 404.
+Cada catálogo sale de su tabla en BackOffice; no hay llamadas a COBIS ni a ForgeRock.
+
+Antes de empezar: confirmar si BELP ya tiene un servicio de catálogos, y agregar Estado a Tipo_transaccion.
+
+Ejemplo de respuesta (GET /v1/catalogos/permisos):
+
+json
+{
+  "tipo": "permisos",
+  "valores": [
+    { "codigo": "CREAR_ROLES", "nombre": "Creación de roles", "categoria": "ADMINISTRATIVO" },
+    { "codigo": "DESCARGAR_ESTADO_CUENTA", "nombre": "Descargar estado de cuenta", "categoria": "MONETARIO" }
+  ]
+}
+
+
+
+////
+
 HU 1 · Registrar a la persona en BELC (belc_persona_canal)
 
 Como backend BELC, quiero un registro local mínimo de cada persona, ligado a su identidad de ForgeRock, para relacionarla con sus empresas, roles y aprobaciones sin duplicar sus datos personales.
