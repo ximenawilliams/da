@@ -1,3 +1,73 @@
+🟢 HU-02 · Crear grupo económico
+
+Microservicio: ms-grupos-economicos · Endpoint: POST /v1/grupos-economicos
+
+Como empleado de Servicio de Canales, quiero registrar un grupo económico, para iniciar la afiliación de sus empresas a BEL Comercial.
+
+Componentes
+Componente	Qué hace en esta historia
+BackOffice web (pantalla del banco)	Formulario con nombre y tipo de administración
+API Gateway	Valida el token del empleado y enruta la petición al microservicio
+ms-grupos-economicos	Valida los datos, guarda el grupo y registra el evento
+Base BELC (Aurora MySQL)	Tablas Grupo_economico, BITACORA_EVENTO y TIPO_EVENTO
+Librería de bitácora (HU-13)	Escribe el evento en la misma transacción que el grupo
+ForgeRock, COBIS	No intervienen en esta historia
+Modelo de datos
+
+Grupo_economico (inserta una fila)
+
+Campo	Valor
+id_grupo_economico	Lo genera la base (PK)
+Nombre	Viene del formulario; obligatorio, máximo 100 caracteres
+Tipo_administracion	I (Individual) o D (Dual), con CHECK
+Fecha_vinculacion	Fecha del servidor
+
+BITACORA_EVENTO (inserta una fila)
+
+Campo	Valor
+id_tipo_evento	→ TIPO_EVENTO con código GRUPO_ECONOMICO_CREADO y categoría BACKOFFICE
+Resultado	Exito o Fallo
+Canal	BO
+id_grupo_economico	El id del grupo recién creado
+Usuario_backoffice	El usuario del empleado
+id_correlacion	El correlationId de la petición
+Entidad, id_registro	Grupo_economico y su id
+Valor_nuevo	El JSON con nombre y tipo
+Fecha_evento_utc	La fecha en UTC
+Contrato
+
+Petición
+
+json
+{ "nombre": "Grupo Pacífico", "tipoAdministracion": "D" }
+
+Respuesta 201
+
+json
+{ "idGrupoEconomico": 20, "nombre": "Grupo Pacífico", "tipoAdministracion": "D", "fechaVinculacion": "2026-10-27" }
+
+Errores: 400 datos inválidos · 401 sin sesión · 403 sin permiso · 409 ya existe un grupo con ese nombre.
+
+Flujo
+El empleado envía el formulario.
+El API Gateway valida su token.
+El microservicio valida el permiso, que el nombre no esté vacío y que el tipo sea I o D.
+En una sola transacción: inserta en Grupo_economico y en BITACORA_EVENTO.
+Responde 201 con el id del grupo.
+Criterios de aceptación
+Guarda el nombre y el tipo de administración (I o D). Cualquier otro tipo responde 400.
+No permite dos grupos con el mismo nombre, aunque cambien mayúsculas o espacios (“Grupo Pacífico” y “grupo pacífico “ son el mismo). Responde 409.
+Devuelve el idGrupoEconomico generado.
+Si falla la escritura en la bitácora, el grupo tampoco se guarda.
+Un empleado sin permiso recibe 403, y el intento queda en la bitácora con resultado Fallo.
+Pendientes antes de empezar
+Agregar un UNIQUE en Grupo_economico.Nombre. En tu diagrama no aparece, y sin él el criterio 2 depende solo del código.
+¿Cómo se autentica el empleado del banco? No es un cliente BELC, así que no entra por el journey de ForgeRock. Probablemente usa el login que ya tiene el BackOffice del banco, con mdl02_employee. Confirmarlo con el líder técnico.
+El nombre del permiso del empleado (por ejemplo, CREAR_GRUPO_ECONOMICO) y dónde se guarda: en el modelo de empleados existente o en uno nuevo.
+Agregar GRUPO_ECONOMICO_CREADO a TIPO_EVENTO en tus inserts.
+
+//////
+
 🟢 HU-01 · Consultar catálogo · GET /v1/catalogos/{tipo}
 Como pantalla de BELC, quiero los valores de un catálogo para llenar las listas desplegables.
 
