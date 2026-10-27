@@ -1,3 +1,42 @@
+No. Esta es la versión corta, con lo esencial para que el desarrollador la construya.
+
+---
+
+## HU · Poblar y mantener `belc_persona_canal`
+
+**Como** backend BELC, **quiero** un registro local mínimo de cada persona ligado a su identidad de ForgeRock, **para** relacionarla con sus empresas, roles y aprobaciones sin duplicar sus datos personales.
+
+**Campos y para qué sirven**
+- `Identity_id`: el `_id` de ForgeRock. Es la llave que une a la persona con todas las tablas de BELC.
+- `Estado_canal`: bloquea las operaciones BELC desde BackOffice, aunque el token de sesión siga vigente.
+- `Nombre_mostrar`: el nombre que se muestra en pantallas, bandejas y bitácora. Es una copia de ForgeRock y no es fuente de verdad.
+- `Terms_version` y `Terms_accepted_at`: evidencia de qué términos aceptó la persona y cuándo.
+- No se guardan el documento, el correo ni el teléfono. Se consultan en ForgeRock cuando hacen falta.
+
+**Cuándo se escribe**
+- **Al registrarse (nodo 200):** se inserta la fila si no existe. Si la persona ya existe, no se duplica.
+- **En cada login:** se actualiza `Nombre_mostrar` solo si cambió en ForgeRock. **No hay copia periódica.**
+- **En la baja:** `Estado_canal = 'INACTIVO'` y después se propaga a IDM `belc.enabled = false`.
+- **Conciliación diaria:** se reintentan las bajas que no llegaron a IDM.
+
+**Criterios de aceptación**
+1. Una persona en varias empresas tiene una sola fila.
+2. Un reintento con el mismo `enrollment_id` no duplica la fila.
+3. Si el nombre cambió, el login lo actualiza; si no cambió, no se escribe nada.
+4. Con `Estado_canal = 'INACTIVO'` se rechaza toda operación BELC.
+5. No se escribe en `mdl01_client` ni se llama a COBIS.
+
+**Dependencia:** ForgeRock tiene que confirmar si el nombre viaja en el token de sesión o hay que leerlo de `/userinfo`.
+
+---
+
+La justificación de por qué se actualiza en el login y no con un batch no la incluí en la historia. Esa explicación es para ti en la reunión; el desarrollador solo necesita saber qué construir.
+
+
+
+
+
+/////////////////
 Probablemente los dos tienen razón, porque están hablando de dos "tokens" distintos. Es una confusión muy común con ForgeRock.
 Los dos tokens
 
