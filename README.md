@@ -722,3 +722,80 @@ CREATE TABLE Transaccion_aprobacion_decision (
 SET FOREIGN_KEY_CHECKS = 1;
 
 SET FOREIGN_KEY_CHECKS = 1;
+
+
+-- =====================================================================
+-- ESQUEMA auditoria · Bitácora común de la banca unificada
+-- Una persona (identity_id), una sesión, un canal (WEB/APP) y dos contextos
+-- (PERSONAL / COMERCIAL). Las dos aplicaciones solo pueden INSERTAR.
+-- =====================================================================
+SET NAMES utf8mb4;
+
+CREATE TABLE TIPO_EVENTO (
+  id_tipo_evento  INT NOT NULL AUTO_INCREMENT,
+  Codigo          VARCHAR(40)  NOT NULL,
+  Nombre          VARCHAR(120) NOT NULL,
+  Categoria       VARCHAR(15) COLLATE utf8mb4_bin NOT NULL,
+  Criticidad      VARCHAR(5)  COLLATE utf8mb4_bin NOT NULL,
+  Visible_cliente BOOLEAN NOT NULL DEFAULT TRUE,
+  Estado          VARCHAR(10) COLLATE utf8mb4_bin NOT NULL DEFAULT 'ACTIVO',
+  PRIMARY KEY (id_tipo_evento),
+  CONSTRAINT uq_tipo_evento_codigo UNIQUE (Codigo),
+  CONSTRAINT ck_tipo_evento_categoria CHECK (Categoria IN ('ACCESO','SEGURIDAD','BACKOFFICE','AUTOGESTION','CONSULTA','TRANSACCION')),
+  CONSTRAINT ck_tipo_evento_criticidad CHECK (Criticidad IN ('BAJA','MEDIA','ALTA')),
+  CONSTRAINT ck_tipo_evento_estado CHECK (Estado IN ('ACTIVO','INACTIVO'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE BITACORA_EVENTO (
+  id_bitacora                  BIGINT NOT NULL AUTO_INCREMENT,
+  Fecha_evento_utc             DATETIME(3) NOT NULL,
+  id_tipo_evento               INT NOT NULL,
+  Resultado                    VARCHAR(10) COLLATE utf8mb4_bin NOT NULL,
+  Canal                        VARCHAR(10) COLLATE utf8mb4_bin NOT NULL,   -- por dónde entró
+  Contexto                     VARCHAR(10) COLLATE utf8mb4_bin NOT NULL,   -- en qué servicios estaba
+  id_grupo_economico           INT NULL,            -- solo en contexto COMERCIAL (sin FK: otro esquema)
+  Identity_id                  VARCHAR(64) NULL,    -- el UUID único de ForgeRock
+  Usuario_backoffice           VARCHAR(80) NULL,
+  Direccion_ip                 VARCHAR(45) NULL,
+  Dispositivo                  VARCHAR(400) NULL,
+  id_sesion                    VARCHAR(100) NULL,
+  id_correlacion               VARCHAR(64) NULL,
+  Metodo_http                  VARCHAR(10) NULL,
+  Uri                          VARCHAR(400) NULL,
+  Entidad                      VARCHAR(50) NULL,
+  id_registro                  VARCHAR(50) NULL,
+  Valor_anterior               JSON NULL,
+  Valor_nuevo                  JSON NULL,
+  id_aprobacion_administrativa INT NULL,
+  id_transaccion_aprobacion    INT NULL,
+  Monto                        DECIMAL(18,2) NULL,
+  Moneda                       CHAR(3) NULL,
+  Cuenta_origen                VARCHAR(40) NULL,    -- siempre enmascarada
+  Cuenta_destino               VARCHAR(40) NULL,    -- siempre enmascarada
+  Tipo_movimiento              VARCHAR(7) NULL,
+  Codigo_error                 VARCHAR(30) NULL,
+  Detalle                      VARCHAR(400) NULL,
+  Hash_registro                VARBINARY(32) NULL,
+  PRIMARY KEY (id_bitacora),
+  CONSTRAINT ck_bitacora_resultado CHECK (Resultado IN ('EXITO','FALLO','RECHAZO')),
+  CONSTRAINT ck_bitacora_canal     CHECK (Canal IN ('WEB','APP','BO','API')),
+  CONSTRAINT ck_bitacora_contexto  CHECK (Contexto IN ('PERSONAL','COMERCIAL','SESION')),
+  -- Un evento del contexto COMERCIAL siempre dice de qué grupo económico es
+  CONSTRAINT ck_bitacora_comercial CHECK (Contexto <> 'COMERCIAL' OR id_grupo_economico IS NOT NULL),
+  CONSTRAINT fk_bitacora_tipo FOREIGN KEY (id_tipo_evento) REFERENCES TIPO_EVENTO (id_tipo_evento)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE INDEX ix_bitacora_fecha   ON BITACORA_EVENTO (Fecha_evento_utc);
+CREATE INDEX ix_bitacora_persona ON BITACORA_EVENTO (Identity_id, Fecha_evento_utc);
+CREATE INDEX ix_bitacora_sesion  ON BITACORA_EVENTO (id_sesion);
+CREATE INDEX ix_bitacora_grupo   ON BITACORA_EVENTO (id_grupo_economico, Fecha_evento_utc);
+CREATE INDEX ix_bitacora_correl  ON BITACORA_EVENTO (id_correlacion);
+
+-- Tipos de evento iniciales
+INSERT INTO TIPO_EVENTO (Codigo, Nombre, Categoria, Criticidad, Visible_cliente) VALUES
+ ('LOGIN_EXITOSO',          'Inicio de sesión exitoso',               'ACCESO',     'BAJA',  TRUE),
+ ('LOGOUT',                 'Cierre de sesión',                       'ACCESO',     'BAJA',  TRUE),
+ ('CAMBIO_CONTEXTO',        'Cambio entre contexto personal y comercial', 'ACCESO', 'BAJA',  TRUE),
+ ('ACCESO_DENEGADO',        'Operación denegada por falta de permiso','SEGURIDAD',  'ALTA',  FALSE),
+ ('GRUPO_ECONOMICO_CREADO', 'Grupo económico creado',                 'BACKOFFICE', 'MEDIA', FALSE),
+ ('EMPRESA_VINCULADA',      'Empresa vinculada a un grupo económico', 'BACKOFFICE', 'MEDIA', FALSE),
+ ('PRODUCTO_VINCULADO',     'Producto vinculado a una empresa',       'BACKOFFICE', 'MEDIA', FALSE);
