@@ -1,0 +1,1468 @@
+﻿Summary,Issue Type,Description,Labels,Labels,Épica,Relaciona con,Relaciona con,Relaciona con,Responsable,Clave técnica
+[TEC-001] Liquibase para los esquemas belc y auditoria en el pipeline,Historia técnica,"h3. Objetivo técnico
+* Que los esquemas belc y auditoria se creen y versionen igual en todos los ambientes, sin scripts manuales.
+h3. Alcance
+* Incluye: Changelog por esquema, ejecución en el pipeline de DEV y QA, prueba de integridad y de permisos.
+* No incluye: Esquema belp (sin cambios); datos de negocio.
+h3. Diseño / arquitectura
+* Escribe: Esquemas belc y auditoria; roles rol_app_belc y rol_app_belp
+h3. Componentes impactados
+* Aurora MySQL · Liquibase
+h3. Dependencias
+* —
+h3. Restricciones
+* Un changelog por esquema. Sin FKs entre esquemas. Ningún cambio al esquema belp.
+h3. Criterios de aceptación técnicos
+* Un changelog por esquema (HT-02). La prueba prueba_integridad_BELC.sql rechaza los 12 casos inválidos en DEV y QA. El rol de BELC recibe 'command denied' al escribir en belp o modificar la bitácora.",historia-tecnica,celula-sre,,,,,Karen Gonzalez,TEC-001
+[TEC-010] Journeys de ForgeRock (registro y login) y claims del token de sesión,Historia técnica,"h3. Objetivo técnico
+* Que una persona invitada pueda registrarse o entrar con su usuario existente y obtenga un token de sesión que indique si tiene acceso a BELP y a BELC.
+h3. Alcance
+* Incluye: Journeys de registro (4a y 4b) y login; claims del token de sesión.
+* No incluye: Acreditación de identidad, MFA y escritura de customProfile.belc (TEC-026); cambios a customProfile.belp.
+h3. Diseño / arquitectura
+* Escribe: managed/user · customProfile.belc
+* Bitácora: LOGIN_EXITOSO, LOGOUT
+h3. Componentes impactados
+* ForgeRock AM + IDM
+h3. Dependencias
+* —
+h3. Restricciones
+* customProfile.belp no se modifica. Un soft token por celular (no se crea otro para BELC).
+h3. Criterios de aceptación técnicos
+* Con lo ya acordado: journeys de registro con invitación (ramas 4a y 4b) y de login, claims identity_id / belp_enabled / belc_enabled en el token de sesión, customProfile.belp sin cambios. Lo pendiente va en TEC-026.
+_Decisión o bloqueo: Sin historias de la PO_",historia-tecnica,celula-forgerock,,,,,Gustavo,TEC-010
+"[TEC-026] ForgeRock: acreditación de identidad, MFA y quién escribe customProfile.belc",Historia técnica,"h3. Objetivo técnico
+* Cerrar las definiciones de identidad que faltan para el registro en BELC.
+h3. Alcance
+* Incluye: Definición y configuración de acreditación, MFA y escritura de customProfile.belc.
+* No incluye: Journeys base (TEC-010).
+h3. Diseño / arquitectura
+* Escribe: managed/user · customProfile.belc
+h3. Componentes impactados
+* ForgeRock AM + IDM
+h3. Dependencias
+* TEC-010
+h3. Restricciones
+* —
+h3. Criterios de aceptación técnicos
+* Definir cómo se acredita la identidad en la rama 4b, qué factor MFA aplica en BELC (soft token del celular u OTP) y qué servicio escribe customProfile.belc.enabled. Luego se configura en los journeys de TEC-010.
+_Decisión o bloqueo: D11_",historia-tecnica,celula-forgerock,,,,,Gustavo,TEC-026
+"[TEC-012] Contratos y mocks de COBIS: empresas, productos, saldos y detalle",Historia técnica,"h3. Objetivo técnico
+* Que los equipos puedan desarrollar contra COBIS sin esperar la integración real.
+h3. Alcance
+* Incluye: Contratos y mocks de empresas, productos, saldos y detalle.
+* No incluye: Transacciones (R2).
+h3. Diseño / arquitectura
+* Lee: COBIS (solo lectura)
+h3. Componentes impactados
+* Adaptador COBIS
+h3. Dependencias
+* —
+h3. Restricciones
+* COBIS es solo lectura en el R1. El mock debe tener el mismo formato que el servicio real.
+h3. Criterios de aceptación técnicos
+* Ejemplos reales de respuesta y tiempos de respuesta de cada servicio. Mock con el mismo formato para DEV.",historia-tecnica,celula-business,,,,,Ezequiel Dawson / Abraham Aizprúa,TEC-012
+[TEC-013] API Gateway y WAF: rutas BELC propias y bloqueo independiente (ADR-002),Historia técnica,"h3. Objetivo técnico
+* Que las rutas de BELC se publiquen, protejan y puedan bloquearse sin afectar a BELP.
+h3. Alcance
+* Incluye: Rutas /v1 de BELC, validación de audiencia y belc_enabled, reglas de WAF y bloqueo por ruta.
+* No incluye: Rutas de BELP.
+h3. Diseño / arquitectura
+* Endpoint: /v1/* de BELC
+h3. Componentes impactados
+* API Gateway · WAF
+h3. Dependencias
+* —
+h3. Restricciones
+* Bloquear BELC no puede afectar las rutas de BELP.
+h3. Criterios de aceptación técnicos
+* Valida audiencia y belc_enabled. Las rutas BELC se bloquean sin tocar las de BELP.",historia-tecnica,celula-sre,,,,,Eric Manuel Hdz.,TEC-013
+[TEC-014] Protección de BELP en Aurora (ADR-002),Historia técnica,"h3. Objetivo técnico
+* Que la carga de BELC en Aurora no degrade a BELP en producción.
+h3. Alcance
+* Incluye: Réplica de lectura, límite de conexiones del usuario BELC y monitoreo por usuario.
+* No incluye: Crecimiento de la bitácora (TEC-018).
+h3. Diseño / arquitectura
+* Ver Componentes impactados.
+h3. Componentes impactados
+* Aurora MySQL
+h3. Dependencias
+* TEC-001
+h3. Restricciones
+* Las consultas de BELC no van al nodo de escritura cuando pueden ir a la réplica.
+h3. Criterios de aceptación técnicos
+* Réplica de lectura para consultas de BELC. MAX_USER_CONNECTIONS en el usuario de BELC. Performance Insights por usuario. El crecimiento de la bitácora se trata en TEC-018.
+_Decisión o bloqueo: Puede iniciar con contratos y mocks de TEC-001; la integración espera que estén terminadas._",historia-tecnica,celula-sre,,,,,Eric Manuel Hdz. / DBA,TEC-014
+[TEC-016] Ajustes de DDL detectados al cruzar el backlog,Historia técnica,"h3. Objetivo técnico
+* Dejar el DDL alineado con lo que piden las historias de la PO.
+h3. Alcance
+* Incluye: Version en Usuario_grupo_economico y carga de los códigos nuevos de TIPO_EVENTO.
+* No incluye: Perfil EJECUTOR hasta cerrar D5.
+h3. Diseño / arquitectura
+* Escribe: Usuario_grupo_economico, perfil, TIPO_EVENTO
+h3. Componentes impactados
+* Aurora MySQL
+h3. Dependencias
+* TEC-001
+h3. Restricciones
+* No agregar EJECUTOR hasta cerrar D5.
+h3. Criterios de aceptación técnicos
+* Ahora: agregar Version a Usuario_grupo_economico (para editar usuario con control de concurrencia) y cargar los códigos de la hoja 'Eventos bitácora'. El perfil EJECUTOR NO se agrega hasta cerrar D5.
+_Decisión o bloqueo: EJECUTOR condicionado a D5 · Puede iniciar con contratos y mocks de TEC-001; la integración espera que estén terminadas._",historia-tecnica,celula-arquitectura,,,,,Ximena Williams,TEC-016
+[TEC-017] Spike: tabla de bitácora común para BELP y BELC,Historia técnica,"h3. Objetivo técnico
+* Responder el spike BELCMW-53: si BELP y BELC usan una o dos tablas de bitácora.
+h3. Alcance
+* Incluye: Recomendación con justificación, ADR-001 y DDL de auditoria.
+* No incluye: Implementación de la librería (TEC-002).
+h3. Diseño / arquitectura
+* Ver Componentes impactados.
+h3. Componentes impactados
+* auditoria
+h3. Dependencias
+* —
+h3. Restricciones
+* Requiere validación de Seguridad y Auditoría.
+h3. Criterios de aceptación técnicos
+* Recomendación: una tabla común (ADR-001, decisión 5). Falta validación de Seguridad y Auditoría.
+
+_Historia funcional: BELCMW-53_
+_Decisión o bloqueo: Validación de Seguridad y Auditoría_",historia-tecnica,celula-arquitectura,BELCMW-3,BELCMW-53,,,Ximena Williams,TEC-017
+[TEC-018] Estrategia de crecimiento de BITACORA_EVENTO,Historia técnica,"h3. Objetivo técnico
+* Definir cómo crece la bitácora en el tiempo sin perder rendimiento ni integridad.
+h3. Alcance
+* Incluye: Comparar opciones, decidir con DBA y Seguridad, ajustar DDL y ADR-002.
+* No incluye: Monitoreo general de Aurora (TEC-014).
+h3. Diseño / arquitectura
+* Escribe: auditoria.BITACORA_EVENTO
+h3. Componentes impactados
+* Aurora MySQL
+h3. Dependencias
+* TEC-001
+h3. Restricciones
+* MySQL no permite FK en tablas particionadas y exige la fecha en la llave primaria.
+h3. Criterios de aceptación técnicos
+* MySQL no permite FK en tablas particionadas y exige la fecha en la llave primaria. Opción A: particionar por mes, quitar la FK a TIPO_EVENTO (la valida lib-bitacora) y PK (id_bitacora, Fecha_evento_utc). Opción B: no particionar; archivado y retención por job. Actualizar ADR-002 con lo que se decida.
+_Decisión o bloqueo: D10_",historia-tecnica,celula-arquitectura,,,,,Ximena Williams / DBA,TEC-018
+[TEC-024] Gestión de token del administrador,Historia técnica,"h3. Objetivo técnico
+* Resolver la historia BELCMW-5 según el tipo de token que defina la PO.
+h3. Alcance
+* Incluye: Según D6: reenvío de invitación o uso del soft token existente.
+* No incluye: Crear un soft token nuevo para BELC.
+h3. Diseño / arquitectura
+* Endpoint: Por definir
+* Escribe: Por definir
+* Bitácora: INVITACION_REENVIADA
+h3. Componentes impactados
+* ms-identidad / ForgeRock
+h3. Dependencias
+* —
+h3. Restricciones
+* Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Si es token de invitación: vencimiento de 72 h y reenvío que genera un Token_hash nuevo. Si es soft token: se reutiliza el del celular (uno por celular), sin tabla en BELC.
+
+_Historia funcional: BELCMW-5_
+_Decisión o bloqueo: D6_",historia-tecnica,celula-be,BELCMW-2,BELCMW-5,,,David Ríos / Gustavo,TEC-024
+[TEC-002] Librería compartida de bitácora,Historia técnica,"h3. Objetivo técnico
+* Que todos los servicios registren los eventos de la misma forma en la bitácora común.
+h3. Alcance
+* Incluye: Registro exitoso, fallido y denegado; hash del registro.
+* No incluye: Consultas o reportes sobre la bitácora.
+h3. Diseño / arquitectura
+* Endpoint: — (librería)
+* Escribe: auditoria.BITACORA_EVENTO
+* Lee: auditoria.TIPO_EVENTO
+* Bitácora: Todos
+h3. Componentes impactados
+* lib-bitacora
+h3. Dependencias
+* TEC-001
+h3. Restricciones
+* Solo INSERT. Nunca guarda tokens, OTP ni números de cuenta completos. Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Solo INSERT. Misma transacción en operaciones exitosas; transacción propia en fallos (403, 504, validación). Llena Canal, Contexto, Identity_id, id_sesion, id_correlacion. Hash_registro SHA-256. Nunca guarda tokens, OTP ni cuentas completas.
+_Decisión o bloqueo: Puede iniciar con contratos y mocks de TEC-001; la integración espera que estén terminadas._",historia-tecnica,celula-be,,,,,Raúl Rojas,TEC-002
+[TEC-003] Servicio de catálogos,Historia técnica,"h3. Objetivo técnico
+* Que las pantallas y servicios obtengan los catálogos (monedas, perfiles, permisos, tipos) de un solo lugar.
+h3. Alcance
+* Incluye: Endpoint de lectura de catálogos activos.
+* No incluye: Mantenimiento de catálogos (se cargan por Liquibase).
+h3. Diseño / arquitectura
+* Endpoint: GET /v1/catalogos/{tipo}
+* Lee: Tipo_documento, moneda, Tipo_transaccion, perfil, permiso, Tipo_visualizacion, Tipo_producto
+h3. Componentes impactados
+* ms-catalogos · COBIS · ForgeRock
+h3. Dependencias
+* TEC-001
+h3. Restricciones
+* Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Solo valores ACTIVO. permisos devuelve Categoria. Tipo desconocido → 404. Sin llamadas a COBIS ni ForgeRock.
+_Decisión o bloqueo: Puede iniciar con contratos y mocks de TEC-001; la integración espera que estén terminadas._",historia-tecnica,celula-be,,,,,Edwin Lima,TEC-003
+"[TEC-004] Validación de sesión, persona, grupo y permisos (middleware)",Historia técnica,"h3. Objetivo técnico
+* Que ningún servicio responda datos de un grupo económico a quien no pertenece a él o no tiene el permiso.
+h3. Alcance
+* Incluye: Validación de token, persona, relación con el grupo y permiso; registro de 403.
+* No incluye: Reglas propias de cada pantalla o servicio.
+h3. Diseño / arquitectura
+* Endpoint: — (middleware)
+* Lee: belc_persona_canal, Usuario_grupo_economico, role, Rol_permiso, permiso
+* Bitácora: ACCESO_DENEGADO
+h3. Componentes impactados
+* Librería común de los microservicios
+h3. Dependencias
+* TEC-002, TEC-010
+h3. Restricciones
+* Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Valida audiencia y belc_enabled del token de sesión. Persona sin fila o Estado_canal INACTIVO → 403. Sin relación ACTIVA con el grupo de la URL → 403 aunque tenga el permiso. Cada 403 se registra (ACCESO_DENEGADO).
+_Decisión o bloqueo: D2 cambia el nombre de la llave si se elige id_persona · Puede iniciar con contratos y mocks de TEC-002, TEC-010; la integración espera que estén terminadas._",historia-tecnica,celula-be,,,,,Domingo Camargo,TEC-004
+[TEC-006] Registro local de la persona y refresco del nombre,Historia técnica,"h3. Objetivo técnico
+* Que BELC conozca a la persona (identity_id y nombre) sin guardar datos sensibles de ForgeRock.
+h3. Alcance
+* Incluye: Alta de la persona en belc_persona_canal y actualización del nombre.
+* No incluye: Datos sensibles de ForgeRock (documento, correo de seguridad, teléfono).
+h3. Diseño / arquitectura
+* Endpoint: — (en vinculación y login)
+* Escribe: belc_persona_canal
+* Lee: belc_persona_canal
+h3. Componentes impactados
+* ms-identidad
+h3. Dependencias
+* TEC-010
+h3. Restricciones
+* No guarda documento, correo de seguridad ni teléfono. Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Inserta si no existe; si existe no duplica ni cambia Fecha_creacion. En cada login actualiza Nombre_mostrar solo si cambió. No guarda documento, correo de seguridad ni teléfono.
+_Decisión o bloqueo: D2_",historia-tecnica,celula-be,,,,,David Ríos,TEC-006
+[TEC-011] Login de empleados del banco en el BackOffice BELC,Historia técnica,"h3. Objetivo técnico
+* Que los empleados del banco entren al BackOffice de BELC con sus usuarios y roles actuales.
+h3. Alcance
+* Incluye: Login de empleados y lectura de sus roles de BELP.
+* No incluye: Tablas nuevas de empleados.
+h3. Diseño / arquitectura
+* Lee: belp.mdl02_employee y tablas de roles mdl02_ (solo SELECT)
+* Bitácora: LOGIN_EXITOSO
+h3. Componentes impactados
+* BackOffice BELC · BELP (solo lectura)
+h3. Dependencias
+* —
+h3. Restricciones
+* Solo SELECT sobre las tablas mdl02_ de BELP (pendiente confirmación, D7). Solo empleados del banco con permiso de BackOffice. Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Reutiliza los empleados de BELP; sin tabla nueva de empleados.
+_Decisión o bloqueo: D7_",historia-tecnica,celula-bo,,,,,Abraham Otero,TEC-011
+[TEC-015] Adaptador de notificaciones por correo,Historia técnica,"h3. Objetivo técnico
+* Que los servicios envíen correos de negocio y de seguridad por un único adaptador.
+h3. Alcance
+* Incluye: Envío por plantilla a correo de negocio o de seguridad.
+* No incluye: Contenido de las plantillas (lo define negocio).
+h3. Diseño / arquitectura
+* Endpoint: — (interno)
+* Lee: Contacto_notificacion, afiliacion
+h3. Componentes impactados
+* ms-notificaciones · ForgeRock
+h3. Dependencias
+* —
+h3. Restricciones
+* Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Avisos de negocio al correo de la relación (Contacto_notificacion); avisos de seguridad al correo de ForgeRock.
+_Decisión o bloqueo: D9_",historia-tecnica,celula-be,,,,,Benjamín Rodríguez,TEC-015
+[TEC-007] BackOffice: crear grupo económico,Historia técnica,"h3. Objetivo técnico
+* Que el banco pueda crear el grupo económico de un cliente comercial.
+h3. Alcance
+* Incluye: Crear grupo con su tipo de administración y el rol administrador inicial; pantalla de BackOffice.
+* No incluye: Edición o baja de grupos.
+h3. Diseño / arquitectura
+* Endpoint: POST /v1/grupos-economicos
+* Escribe: Grupo_economico, role (administrador inicial)
+* Bitácora: GRUPO_ECONOMICO_CREADO
+h3. Componentes impactados
+* ms-grupos-economicos
+h3. Dependencias
+* TEC-002, TEC-011
+h3. Restricciones
+* Solo empleados del banco con permiso de BackOffice. Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Tipo_administracion I o D. Nombre único sin importar mayúsculas (409). Crea en la misma transacción el rol administrador inicial del grupo. Devuelve idGrupoEconomico.
+_Decisión o bloqueo: Sin historia de la PO (ver Brechas) · Puede iniciar con contratos y mocks de TEC-002, TEC-011; la integración espera que estén terminadas. Ojo: TEC-011 espera decisión._",historia-tecnica,celula-bo,,,,,Alfredo Pinzón / Chaidir Charpenter,TEC-007
+[TEC-008] BackOffice: buscar y vincular empresas desde COBIS,Historia técnica,"h3. Objetivo técnico
+* Que el banco vincule al grupo las empresas que existen en COBIS.
+h3. Alcance
+* Incluye: Búsqueda en COBIS y vinculación de empresas al grupo; pantalla de BackOffice.
+* No incluye: Desvincular empresas.
+h3. Diseño / arquitectura
+* Endpoint: GET /v1/empresas-core?identificacion= · POST /v1/grupos-economicos/{id}/empresas
+* Escribe: Empresas_asociadas
+* Lee: Grupo_economico
+* Bitácora: EMPRESA_VINCULADA
+h3. Componentes impactados
+* ms-grupos-economicos · COBIS
+h3. Dependencias
+* TEC-012
+h3. Restricciones
+* Una empresa pertenece a un solo grupo. Se vuelve a consultar COBIS al confirmar. Solo empleados del banco con permiso de BackOffice. Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Vuelve a consultar COBIS al confirmar. Una empresa en un solo grupo (409). COBIS sin respuesta → 504 y no guarda nada.
+_Decisión o bloqueo: Sin historia de la PO (ver Brechas) · Puede iniciar con contratos y mocks de TEC-012; la integración espera que estén terminadas._",historia-tecnica,celula-bo,,,,,Jonathan Vargas / Rusbenin Chinchilla,TEC-008
+[TEC-009] BackOffice: vincular productos de la empresa,Historia técnica,"h3. Objetivo técnico
+* Que el banco vincule al grupo los productos de cada empresa.
+h3. Alcance
+* Incluye: Consulta en COBIS y vinculación de productos; pantalla de BackOffice.
+* No incluye: Saldos y movimientos.
+h3. Diseño / arquitectura
+* Endpoint: GET .../empresas/{idEmpresa}/productos-core · POST .../empresas/{idEmpresa}/productos
+* Escribe: Producto_vinculacion (con id_grupo_economico)
+* Lee: Empresas_asociadas, Tipo_producto, moneda
+* Bitácora: PRODUCTO_VINCULADO
+h3. Componentes impactados
+* ms-grupos-economicos · COBIS
+h3. Dependencias
+* TEC-012
+h3. Restricciones
+* Solo productos de esa empresa en COBIS. Solo número enmascarado. Solo empleados del banco con permiso de BackOffice. Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Solo productos de esa empresa en COBIS. Solo número enmascarado. No vincula dos veces (409). Varios productos: todo o nada.
+_Decisión o bloqueo: Sin historia de la PO (ver Brechas) · Puede iniciar con contratos y mocks de TEC-012; la integración espera que estén terminadas._",historia-tecnica,celula-bo,,,,,Héctor Durán,TEC-009
+[TEC-019] BackOffice del banco: invitar al primer administrador del grupo,Historia técnica,"h3. Objetivo técnico
+* Que el banco invite al primer administrador para que el cliente pueda entrar.
+h3. Alcance
+* Incluye: Invitación del primer administrador o de los dos si es dual; pantalla de BackOffice.
+* No incluye: Invitaciones de usuarios secundarios (TEC-032).
+h3. Diseño / arquitectura
+* Endpoint: POST /v1/grupos-economicos/{id}/administradores/invitaciones
+* Escribe: afiliacion
+* Lee: Grupo_economico, Empresas_asociadas, role, Tipo_documento
+* Bitácora: ADMINISTRADOR_INVITADO
+h3. Componentes impactados
+* ms-grupos-economicos
+h3. Dependencias
+* TEC-007, TEC-009, TEC-011
+h3. Restricciones
+* Solo empleados del banco con permiso de BackOffice. Solo se guarda el hash del token. Solo empleados del banco con permiso de BackOffice. Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Solo un empleado del banco con permiso de BackOffice. El grupo debe tener al menos una empresa y un producto vinculados. Usa el rol administrador inicial creado con el grupo (TEC-007). Respeta Tipo_administracion: I = un administrador, D = dos. Vencimiento 72 h y solo el hash del token.
+_Decisión o bloqueo: Hereda D1 y D7; sin historia de la PO (ver Brechas)_",historia-tecnica,celula-bo,,,,,Héctor Durán,TEC-019
+[TEC-022] Validar invitación de un administrador sin usuario previo,Historia técnica,"h3. Objetivo técnico
+* Que un administrador sin usuario previo valide su invitación antes de crear su identidad.
+h3. Alcance
+* Incluye: Validación de enrollment_id, documento y token.
+* No incluye: Creación de la identidad (TEC-023).
+h3. Diseño / arquitectura
+* Endpoint: POST /v1/afiliaciones/validacion
+* Lee: afiliacion
+h3. Componentes impactados
+* ms-identidad · ForgeRock
+h3. Dependencias
+* TEC-010
+h3. Restricciones
+* No revela si el documento existe. Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Recibe enrollment_id y documento normalizado; compara el hash del token. Responde válida sí o no, sin revelar si el documento existe.
+
+_Historia funcional: BELCMW-4_
+_Decisión o bloqueo: Coordinar con Gustavo (ForgeRock) · Puede iniciar con contratos y mocks de TEC-010; la integración espera que estén terminadas._",historia-tecnica,celula-be,BELCMW-2,BELCMW-4,,,David Ríos,TEC-022
+"[TEC-023] Pantallas del registro (rama 4b: crear identidad, OTP, contraseña)",Historia técnica,"h3. Objetivo técnico
+* Que la persona invitada sin usuario pueda crear su identidad (rama 4b).
+h3. Alcance
+* Incluye: Pantallas de crear identidad, OTP y contraseña.
+* No incluye: Login de personas con usuario existente.
+h3. Diseño / arquitectura
+* Consume: POST /v1/afiliaciones/validacion (TEC-022)
+h3. Componentes impactados
+* Journey de registro · ForgeRock
+h3. Dependencias
+* TEC-010
+h3. Restricciones
+* Sin reglas de negocio en la pantalla: la API decide. Muestra solo lo que permite el contexto de sesión. Mismo contrato que usará la App.
+h3. Criterios de aceptación técnicos
+* Mismo diseño para administrador y usuario secundario (BELCMW-46).
+
+_Historia funcional: BELCMW-4_
+_Decisión o bloqueo: Coordinar con Gustavo (ForgeRock) · Puede iniciar con contratos y mocks de TEC-010; la integración espera que estén terminadas._",historia-tecnica,celula-web,BELCMW-2,BELCMW-4,,,Isis López / Gustavo,TEC-023
+[TEC-020] Vincular la persona al aceptar la invitación (nodo 200),Historia técnica,"h3. Objetivo técnico
+* Que al aceptar la invitación la persona quede vinculada a su grupo económico con su rol.
+h3. Alcance
+* Incluye: Vinculación idempotente, alta de administrador si aplica y correo de negocio verificado.
+* No incluye: Envío del correo de invitación (TEC-034).
+h3. Diseño / arquitectura
+* Endpoint: POST /v1/afiliaciones/{enrollmentId}/vinculacion
+* Escribe: afiliacion (COMPLETADA), belc_persona_canal, Usuario_grupo_economico, Grupo_economico_administrador, Contacto_notificacion
+* Lee: afiliacion
+* Bitácora: AFILIACION_COMPLETADA
+h3. Componentes impactados
+* ms-identidad · ForgeRock
+h3. Dependencias
+* TEC-006, TEC-010, TEC-019, TEC-026
+h3. Restricciones
+* Idempotente por enrollment_id. Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Valida invitación vigente y no usada. Idempotente por enrollment_id. Si el rol es de administrador, crea Grupo_economico_administrador. Guarda el correo verificado por OTP en Contacto_notificacion.
+
+_Historia funcional: BELCMW-1_
+_Decisión o bloqueo: D1, D2 · coordinar con Gustavo (ForgeRock)_",historia-tecnica,celula-be,BELCMW-2,BELCMW-1,,,David Ríos,TEC-020
+[TEC-021] Pantalla de aceptación de invitación y paso al journey,Historia técnica,"h3. Objetivo técnico
+* Que la persona abra el enlace de invitación y siga al registro o al login.
+h3. Alcance
+* Incluye: Pantalla de aceptación, mensajes de invitación vencida o inválida.
+* No incluye: Pantallas del journey (TEC-023).
+h3. Diseño / arquitectura
+* Consume: POST /v1/afiliaciones/{enrollmentId}/vinculacion (TEC-020)
+h3. Componentes impactados
+* Web BELC · ForgeRock
+h3. Dependencias
+* TEC-020
+h3. Restricciones
+* Sin reglas de negocio en la pantalla: la API decide. Muestra solo lo que permite el contexto de sesión. Mismo contrato que usará la App.
+h3. Criterios de aceptación técnicos
+* Recibe el enlace con enrollment_id y token; muestra invitación vencida o inválida con mensaje genérico.
+
+_Historia funcional: BELCMW-1_
+_Decisión o bloqueo: Coordinar con Gustavo (ForgeRock) · Puede iniciar con contratos y mocks de TEC-020; la integración espera que estén terminadas. Ojo: TEC-020 espera decisión._",historia-tecnica,celula-web,BELCMW-2,BELCMW-1,,,Isis López,TEC-021
+[TEC-005] Servicio de contexto de sesión,Historia técnica,"h3. Objetivo técnico
+* Que el canal sepa en qué contexto está la persona, qué contextos tiene y qué puede hacer.
+h3. Alcance
+* Incluye: Consulta del contexto activo, contextos disponibles, permisos y productos.
+* No incluye: Cambio de contexto (TEC-100).
+h3. Diseño / arquitectura
+* Endpoint: GET /v1/sesion/contexto
+* Lee: Usuario_grupo_economico, Grupo_economico, role, perfil, Rol_permiso, permiso, Rol_grupo_producto, Grupo_producto, Grupo_economico_administrador, Tipo_visualizacion
+h3. Componentes impactados
+* ms-identidad
+h3. Dependencias
+* TEC-004
+h3. Restricciones
+* Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Devuelve contexto activo, contextos disponibles (PERSONAL solo si belp_enabled = true), permisos, grupos de productos y esAdministrador. Formato igual a los ejemplos de UX.
+_Decisión o bloqueo: D1, D3_",historia-tecnica,celula-be,,,,,Domingo Camargo,TEC-005
+[TEC-025] Mostrar el módulo de Administración solo con permisos administrativos,Historia técnica,"h3. Objetivo técnico
+* Que solo vea el módulo de Administración quien tiene permisos administrativos.
+h3. Alcance
+* Incluye: Mostrar u ocultar el menú según el contexto de sesión.
+* No incluye: Validación del permiso en la API (TEC-004).
+h3. Diseño / arquitectura
+* Endpoint: GET /v1/sesion/contexto
+h3. Componentes impactados
+* Web BELC
+h3. Dependencias
+* TEC-005
+h3. Restricciones
+* Sin reglas de negocio en la pantalla: la API decide. Muestra solo lo que permite el contexto de sesión. Mismo contrato que usará la App.
+h3. Criterios de aceptación técnicos
+* El menú aparece si esAdministrador o si hay permisos de categoría ADMINISTRATIVO. La API rechaza igual (403) aunque se fuerce la URL.
+
+_Historia funcional: BELCMW-7_
+_Decisión o bloqueo: Hereda D1 y D3 de TEC-005_",historia-tecnica,celula-web,BELCMW-6,BELCMW-7,,,Allan Bennett,TEC-025
+[TEC-070] Listar y buscar grupos de productos,Historia técnica,"h3. Objetivo técnico
+* Que el administrador consulte los grupos de productos de su grupo económico.
+h3. Alcance
+* Incluye: Listar y buscar grupos de productos: endpoint, validaciones y bitácora.
+* No incluye: La pantalla (TEC-071).
+h3. Diseño / arquitectura
+* Endpoint: GET /v1/grupos-economicos/{id}/grupos-productos?texto=
+* Lee: Grupo_producto, Grupo_producto_detalle, Producto_vinculacion, Tipo_producto, Empresas_asociadas
+h3. Componentes impactados
+* ms-autogestion
+h3. Dependencias
+* TEC-004
+h3. Restricciones
+* Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Formato de tu contrato (paso 1), con productosDisponiblesSinGrupo.
+
+_Historia funcional: BELCMW-28, BELCMW-29_
+_Decisión o bloqueo: Puede iniciar con contratos y mocks de TEC-004; la integración espera que estén terminadas._",historia-tecnica,celula-be,BELCMW-27,BELCMW-28,BELCMW-29,,Benjamín Rodríguez,TEC-070
+[TEC-071] Pantalla de listado y búsqueda de grupos de productos,Historia técnica,"h3. Objetivo técnico
+* Que el administrador vea y busque sus grupos de productos.
+h3. Alcance
+* Incluye: Pantalla Web: pantalla de listado y búsqueda de grupos de productos.
+* No incluye: App (otro tablero); el servicio (TEC-070).
+h3. Diseño / arquitectura
+* Consume: GET /v1/grupos-economicos/{id}/grupos-productos?texto= (TEC-070)
+h3. Componentes impactados
+* Web BELC
+h3. Dependencias
+* TEC-070
+h3. Restricciones
+* Sin reglas de negocio en la pantalla: la API decide. Muestra solo lo que permite el contexto de sesión. Mismo contrato que usará la App.
+h3. Criterios de aceptación técnicos
+* Lista con cantidad de productos por grupo y los productos sin grupo. Búsqueda por nombre. Número de cuenta siempre enmascarado.
+
+_Historia funcional: BELCMW-28, BELCMW-29_
+_Decisión o bloqueo: Puede iniciar con contratos y mocks de TEC-070; la integración espera que estén terminadas._",historia-tecnica,celula-web,BELCMW-27,BELCMW-28,BELCMW-29,,Isis López,TEC-071
+[TEC-072] Crear grupo de productos,Historia técnica,"h3. Objetivo técnico
+* Que el administrador agrupe productos para asignarlos luego a roles.
+h3. Alcance
+* Incluye: Crear grupo de productos: endpoint, validaciones y bitácora.
+* No incluye: La pantalla (TEC-073).
+h3. Diseño / arquitectura
+* Endpoint: POST /v1/grupos-economicos/{id}/grupos-productos
+* Escribe: Grupo_producto, Grupo_producto_detalle (con id_grupo_economico)
+* Lee: Producto_vinculacion
+* Bitácora: GRUPO_PRODUCTOS_CREADO
+h3. Componentes impactados
+* ms-autogestion
+h3. Dependencias
+* TEC-004, TEC-009
+h3. Restricciones
+* Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Solo productos ACTIVO del mismo grupo económico (FK compuesta). Puede mezclar empresas del grupo. Nombre único por grupo.
+
+_Historia funcional: BELCMW-30_
+_Decisión o bloqueo: Puede iniciar con contratos y mocks de TEC-004, TEC-009; la integración espera que estén terminadas._",historia-tecnica,celula-be,BELCMW-27,BELCMW-30,,,Benjamín Rodríguez,TEC-072
+[TEC-073] Pantalla de creación de grupo de productos,Historia técnica,"h3. Objetivo técnico
+* Que el administrador cree un grupo de productos desde la Web.
+h3. Alcance
+* Incluye: Pantalla Web: pantalla de creación de grupo de productos.
+* No incluye: App (otro tablero); el servicio (TEC-072).
+h3. Diseño / arquitectura
+* Consume: POST /v1/grupos-economicos/{id}/grupos-productos (TEC-072)
+h3. Componentes impactados
+* Web BELC
+h3. Dependencias
+* TEC-072
+h3. Restricciones
+* Sin reglas de negocio en la pantalla: la API decide. Muestra solo lo que permite el contexto de sesión. Mismo contrato que usará la App.
+h3. Criterios de aceptación técnicos
+* Selector de productos del grupo económico, agrupados por empresa. Exige nombre y al menos un producto. Nombre duplicado (409) → mensaje en el campo.
+
+_Historia funcional: BELCMW-30_
+_Decisión o bloqueo: Puede iniciar con contratos y mocks de TEC-072; la integración espera que estén terminadas._",historia-tecnica,celula-web,BELCMW-27,BELCMW-30,,,Isis López,TEC-073
+[TEC-074] Consultar detalle de grupo de productos,Historia técnica,"h3. Objetivo técnico
+* Que el administrador consulte un grupo de productos y quién lo usa.
+h3. Alcance
+* Incluye: Consultar detalle de grupo de productos: endpoint, validaciones y bitácora.
+* No incluye: La pantalla (TEC-075).
+h3. Diseño / arquitectura
+* Endpoint: GET /v1/grupos-economicos/{id}/grupos-productos/{idGrupoProducto}
+* Lee: Grupo_producto, Grupo_producto_detalle, Producto_vinculacion, Rol_grupo_producto
+h3. Componentes impactados
+* ms-autogestion
+h3. Dependencias
+* TEC-004
+h3. Restricciones
+* Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Incluye los roles que lo usan.
+
+_Historia funcional: BELCMW-31_
+_Decisión o bloqueo: Puede iniciar con contratos y mocks de TEC-004; la integración espera que estén terminadas._",historia-tecnica,celula-be,BELCMW-27,BELCMW-31,,,Benjamín Rodríguez,TEC-074
+[TEC-075] Pantalla de detalle de grupo de productos,Historia técnica,"h3. Objetivo técnico
+* Que el administrador vea el detalle de un grupo de productos.
+h3. Alcance
+* Incluye: Pantalla Web: pantalla de detalle de grupo de productos.
+* No incluye: App (otro tablero); el servicio (TEC-074).
+h3. Diseño / arquitectura
+* Consume: GET /v1/grupos-economicos/{id}/grupos-productos/{idGrupoProducto} (TEC-074)
+h3. Componentes impactados
+* Web BELC
+h3. Dependencias
+* TEC-074
+h3. Restricciones
+* Sin reglas de negocio en la pantalla: la API decide. Muestra solo lo que permite el contexto de sesión. Mismo contrato que usará la App.
+h3. Criterios de aceptación técnicos
+* Muestra productos (enmascarados) y los roles que usan el grupo.
+
+_Historia funcional: BELCMW-31_
+_Decisión o bloqueo: Puede iniciar con contratos y mocks de TEC-074; la integración espera que estén terminadas._",historia-tecnica,celula-web,BELCMW-27,BELCMW-31,,,Isis López,TEC-075
+[TEC-076] Modificar grupo de productos,Historia técnica,"h3. Objetivo técnico
+* Que el administrador cambie los productos de un grupo sin pisar cambios de otro administrador.
+h3. Alcance
+* Incluye: Modificar grupo de productos: endpoint, validaciones y bitácora.
+* No incluye: La pantalla (TEC-077).
+h3. Diseño / arquitectura
+* Endpoint: PUT /v1/grupos-economicos/{id}/grupos-productos/{idGrupoProducto}
+* Escribe: Grupo_producto, Grupo_producto_detalle
+* Lee: Producto_vinculacion
+* Bitácora: GRUPO_PRODUCTOS_EDITADO
+h3. Componentes impactados
+* ms-autogestion
+h3. Dependencias
+* TEC-072
+h3. Restricciones
+* Concurrencia optimista con Version. Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* UPDATE con WHERE Version (409). Un cambio en el detalle sube Grupo_producto.Version.
+
+_Historia funcional: BELCMW-32_
+_Decisión o bloqueo: Puede iniciar con contratos y mocks de TEC-072; la integración espera que estén terminadas._",historia-tecnica,celula-be,BELCMW-27,BELCMW-32,,,Benjamín Rodríguez,TEC-076
+[TEC-077] Pantalla de modificación de grupo de productos,Historia técnica,"h3. Objetivo técnico
+* Que el administrador modifique un grupo de productos desde la Web.
+h3. Alcance
+* Incluye: Pantalla Web: pantalla de modificación de grupo de productos.
+* No incluye: App (otro tablero); el servicio (TEC-076).
+h3. Diseño / arquitectura
+* Consume: PUT /v1/grupos-economicos/{id}/grupos-productos/{idGrupoProducto} (TEC-076)
+h3. Componentes impactados
+* Web BELC
+h3. Dependencias
+* TEC-076
+h3. Restricciones
+* Sin reglas de negocio en la pantalla: la API decide. Muestra solo lo que permite el contexto de sesión. Mismo contrato que usará la App.
+h3. Criterios de aceptación técnicos
+* Envía Version; si responde 409, avisa que otro administrador lo cambió y recarga.
+
+_Historia funcional: BELCMW-32_
+_Decisión o bloqueo: Puede iniciar con contratos y mocks de TEC-076; la integración espera que estén terminadas._",historia-tecnica,celula-web,BELCMW-27,BELCMW-32,,,Isis López,TEC-077
+[TEC-078] Eliminar grupo de productos,Historia técnica,"h3. Objetivo técnico
+* Que el administrador dé de baja un grupo de productos que ya no se usa.
+h3. Alcance
+* Incluye: Eliminar grupo de productos: endpoint, validaciones y bitácora.
+* No incluye: La pantalla (TEC-079).
+h3. Diseño / arquitectura
+* Endpoint: DELETE /v1/grupos-economicos/{id}/grupos-productos/{idGrupoProducto}
+* Escribe: Grupo_producto (Estado = INACTIVO)
+* Lee: Rol_grupo_producto
+* Bitácora: GRUPO_PRODUCTOS_ELIMINADO
+h3. Componentes impactados
+* ms-autogestion
+h3. Dependencias
+* TEC-072
+h3. Restricciones
+* Baja lógica (Estado = INACTIVO), nunca DELETE físico. Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Baja lógica. Si está asignado a algún rol → 409.
+
+_Historia funcional: BELCMW-33_
+_Decisión o bloqueo: Puede iniciar con contratos y mocks de TEC-072; la integración espera que estén terminadas._",historia-tecnica,celula-be,BELCMW-27,BELCMW-33,,,Benjamín Rodríguez,TEC-078
+[TEC-079] Confirmación de eliminación de grupo de productos,Historia técnica,"h3. Objetivo técnico
+* Que la baja de un grupo de productos se confirme y explique cuando no es posible.
+h3. Alcance
+* Incluye: Pantalla Web: confirmación de eliminación de grupo de productos.
+* No incluye: App (otro tablero); el servicio (TEC-078).
+h3. Diseño / arquitectura
+* Consume: DELETE /v1/grupos-economicos/{id}/grupos-productos/{idGrupoProducto} (TEC-078)
+h3. Componentes impactados
+* Web BELC
+h3. Dependencias
+* TEC-078
+h3. Restricciones
+* Sin reglas de negocio en la pantalla: la API decide. Muestra solo lo que permite el contexto de sesión. Mismo contrato que usará la App.
+h3. Criterios de aceptación técnicos
+* Pide confirmación. Si está asignado a roles (409), muestra cuáles y no elimina.
+
+_Historia funcional: BELCMW-33_
+_Decisión o bloqueo: Puede iniciar con contratos y mocks de TEC-078; la integración espera que estén terminadas._",historia-tecnica,celula-web,BELCMW-27,BELCMW-33,,,Isis López,TEC-079
+"[TEC-054] Permisos por perfil: Creador, Aprobador y Ejecutor",Historia técnica,"h3. Objetivo técnico
+* Que cada perfil tenga definido qué permisos puede otorgar un rol.
+h3. Alcance
+* Incluye: Carga inicial de perfil_permiso y endpoint de consulta por perfil.
+* No incluye: Perfil EJECUTOR hasta cerrar D5.
+h3. Diseño / arquitectura
+* Endpoint: GET /v1/catalogos/perfiles/{codigo}/permisos
+* Escribe: perfil_permiso (carga inicial)
+* Lee: perfil, permiso
+h3. Componentes impactados
+* ms-catalogos
+h3. Dependencias
+* TEC-003, TEC-016
+h3. Restricciones
+* Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Carga inicial por Liquibase. El perfil EJECUTOR no existe hoy en los contratos (solo CREADOR y APROBADOR).
+
+_Historia funcional: BELCMW-21, BELCMW-22, BELCMW-23_
+_Decisión o bloqueo: D5_",historia-tecnica,celula-be,BELCMW-17,BELCMW-21,BELCMW-22,BELCMW-23,Edwin Lima,TEC-054
+[TEC-055] Pantalla de permisos por perfil,Historia técnica,"h3. Objetivo técnico
+* Que se vean los permisos permitidos por cada perfil.
+h3. Alcance
+* Incluye: Vista de permisos por perfil.
+* No incluye: Edición si D5 decide que solo el banco define permisos.
+h3. Diseño / arquitectura
+* Consume: GET /v1/catalogos/perfiles/{codigo}/permisos (TEC-054)
+h3. Componentes impactados
+* Web BELC
+h3. Dependencias
+* TEC-054
+h3. Restricciones
+* Sin reglas de negocio en la pantalla: la API decide. Muestra solo lo que permite el contexto de sesión. Mismo contrato que usará la App.
+h3. Criterios de aceptación técnicos
+* Muestra los permisos de cada perfil en modo lectura o edición según D5. Sin perfil EJECUTOR hasta que se defina D5.
+
+_Historia funcional: BELCMW-21, BELCMW-22, BELCMW-23_
+_Decisión o bloqueo: D5_",historia-tecnica,celula-web,BELCMW-17,BELCMW-21,BELCMW-22,BELCMW-23,Yesuri Barría,TEC-055
+[TEC-050] Listar y buscar roles,Historia técnica,"h3. Objetivo técnico
+* Que el administrador consulte los roles de su grupo económico.
+h3. Alcance
+* Incluye: Listar y buscar roles: endpoint, validaciones y bitácora.
+* No incluye: La pantalla (TEC-051).
+h3. Diseño / arquitectura
+* Endpoint: GET /v1/grupos-economicos/{id}/roles?texto=
+* Lee: role, perfil, Rol_permiso, permiso, Rol_grupo_producto, Grupo_producto
+h3. Componentes impactados
+* ms-autogestion
+h3. Dependencias
+* TEC-004
+h3. Restricciones
+* Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Formato de tu contrato (paso 2): permisos administrativos y monetarios separados.
+
+_Historia funcional: BELCMW-18, BELCMW-19_
+_Decisión o bloqueo: Puede iniciar con contratos y mocks de TEC-004; la integración espera que estén terminadas._",historia-tecnica,celula-be,BELCMW-17,BELCMW-18,BELCMW-19,,Edwin Lima,TEC-050
+[TEC-051] Pantalla de listado y búsqueda de roles,Historia técnica,"h3. Objetivo técnico
+* Que el administrador vea y busque sus roles.
+h3. Alcance
+* Incluye: Pantalla Web: pantalla de listado y búsqueda de roles.
+* No incluye: App (otro tablero); el servicio (TEC-050).
+h3. Diseño / arquitectura
+* Consume: GET /v1/grupos-economicos/{id}/roles?texto= (TEC-050)
+h3. Componentes impactados
+* Web BELC
+h3. Dependencias
+* TEC-050
+h3. Restricciones
+* Sin reglas de negocio en la pantalla: la API decide. Muestra solo lo que permite el contexto de sesión. Mismo contrato que usará la App.
+h3. Criterios de aceptación técnicos
+* Lista con perfil y permisos administrativos y monetarios separados. Búsqueda por nombre. Botón Crear solo con permiso.
+
+_Historia funcional: BELCMW-18, BELCMW-19_
+_Decisión o bloqueo: Puede iniciar con contratos y mocks de TEC-050; la integración espera que estén terminadas._",historia-tecnica,celula-web,BELCMW-17,BELCMW-18,BELCMW-19,,Yesuri Barría,TEC-051
+[TEC-052] Crear rol,Historia técnica,"h3. Objetivo técnico
+* Que el administrador cree roles con permisos y grupos de productos válidos.
+h3. Alcance
+* Incluye: Crear rol: endpoint, validaciones y bitácora.
+* No incluye: La pantalla (TEC-053).
+h3. Diseño / arquitectura
+* Endpoint: POST /v1/grupos-economicos/{id}/roles
+* Escribe: role, Rol_permiso, Rol_grupo_producto (con id_grupo_economico)
+* Lee: perfil, perfil_permiso, permiso, Grupo_producto
+* Bitácora: ROL_CREADO
+h3. Componentes impactados
+* ms-autogestion
+h3. Dependencias
+* TEC-003, TEC-004
+h3. Restricciones
+* Permisos dentro de los de su perfil. Codigo_role único por grupo. Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Los permisos del rol deben estar dentro de los permitidos para su perfil (perfil_permiso). Grupos de productos del mismo grupo (FK compuesta). Codigo_role único por grupo (uq_role_codigo) → 409; el nombre puede repetirse. Si exige grupo de productos depende de D12.
+
+_Historia funcional: BELCMW-20_
+_Decisión o bloqueo: D12 solo para la regla del grupo de productos · Puede iniciar con contratos y mocks de TEC-003, TEC-004; la integración espera que estén terminadas._",historia-tecnica,celula-be,BELCMW-17,BELCMW-20,,,Edwin Lima,TEC-052
+[TEC-053] Pantalla de creación de rol,Historia técnica,"h3. Objetivo técnico
+* Que el administrador cree un rol desde la Web.
+h3. Alcance
+* Incluye: Pantalla Web: pantalla de creación de rol.
+* No incluye: App (otro tablero); el servicio (TEC-052).
+h3. Diseño / arquitectura
+* Consume: POST /v1/grupos-economicos/{id}/roles (TEC-052)
+h3. Componentes impactados
+* Web BELC
+h3. Dependencias
+* TEC-052
+h3. Restricciones
+* Sin reglas de negocio en la pantalla: la API decide. Muestra solo lo que permite el contexto de sesión. Mismo contrato que usará la App.
+h3. Criterios de aceptación técnicos
+* Al elegir el perfil solo ofrece sus permisos. Exige al menos un permiso; el grupo de productos según D12. Código duplicado en el grupo (409) → mensaje en el campo Código.
+
+_Historia funcional: BELCMW-20_
+_Decisión o bloqueo: D12 solo para la regla del grupo de productos · Puede iniciar con contratos y mocks de TEC-052; la integración espera que estén terminadas._",historia-tecnica,celula-web,BELCMW-17,BELCMW-20,,,Yesuri Barría,TEC-053
+[TEC-056] Consultar detalle de rol,Historia técnica,"h3. Objetivo técnico
+* Que el administrador consulte un rol y cuántos usuarios lo tienen.
+h3. Alcance
+* Incluye: Consultar detalle de rol: endpoint, validaciones y bitácora.
+* No incluye: La pantalla (TEC-057).
+h3. Diseño / arquitectura
+* Endpoint: GET /v1/grupos-economicos/{id}/roles/{idRol}
+* Lee: role, Rol_permiso, permiso, Rol_grupo_producto, Grupo_producto, Usuario_grupo_economico
+h3. Componentes impactados
+* ms-autogestion
+h3. Dependencias
+* TEC-004
+h3. Restricciones
+* Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Incluye cuántos usuarios lo tienen asignado.
+
+_Historia funcional: BELCMW-24_
+_Decisión o bloqueo: Puede iniciar con contratos y mocks de TEC-004; la integración espera que estén terminadas._",historia-tecnica,celula-be,BELCMW-17,BELCMW-24,,,Edwin Lima,TEC-056
+[TEC-057] Pantalla de detalle de rol,Historia técnica,"h3. Objetivo técnico
+* Que el administrador vea el detalle de un rol.
+h3. Alcance
+* Incluye: Pantalla Web: pantalla de detalle de rol.
+* No incluye: App (otro tablero); el servicio (TEC-056).
+h3. Diseño / arquitectura
+* Consume: GET /v1/grupos-economicos/{id}/roles/{idRol} (TEC-056)
+h3. Componentes impactados
+* Web BELC
+h3. Dependencias
+* TEC-056
+h3. Restricciones
+* Sin reglas de negocio en la pantalla: la API decide. Muestra solo lo que permite el contexto de sesión. Mismo contrato que usará la App.
+h3. Criterios de aceptación técnicos
+* Muestra permisos, grupos de productos y cuántos usuarios tienen el rol. Editar y Eliminar visibles solo con permiso.
+
+_Historia funcional: BELCMW-24_
+_Decisión o bloqueo: Puede iniciar con contratos y mocks de TEC-056; la integración espera que estén terminadas._",historia-tecnica,celula-web,BELCMW-17,BELCMW-24,,,Yesuri Barría,TEC-057
+[TEC-058] Editar rol,Historia técnica,"h3. Objetivo técnico
+* Que el administrador cambie un rol sin pisar cambios de otro administrador.
+h3. Alcance
+* Incluye: Editar rol: endpoint, validaciones y bitácora.
+* No incluye: La pantalla (TEC-059).
+h3. Diseño / arquitectura
+* Endpoint: PUT /v1/grupos-economicos/{id}/roles/{idRol}
+* Escribe: role, Rol_permiso, Rol_grupo_producto
+* Lee: perfil_permiso
+* Bitácora: ROL_EDITADO
+h3. Componentes impactados
+* ms-autogestion
+h3. Dependencias
+* TEC-052
+h3. Restricciones
+* Concurrencia optimista con Version. Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* UPDATE con WHERE Version; si cambió → 409. Un cambio en permisos o grupos de productos sube role.Version (regla del padre). Valor anterior y nuevo en la bitácora.
+
+_Historia funcional: BELCMW-25_
+_Decisión o bloqueo: Puede iniciar con contratos y mocks de TEC-052; la integración espera que estén terminadas._",historia-tecnica,celula-be,BELCMW-17,BELCMW-25,,,Edwin Lima,TEC-058
+[TEC-059] Pantalla de edición de rol,Historia técnica,"h3. Objetivo técnico
+* Que el administrador edite un rol desde la Web.
+h3. Alcance
+* Incluye: Pantalla Web: pantalla de edición de rol.
+* No incluye: App (otro tablero); el servicio (TEC-058).
+h3. Diseño / arquitectura
+* Consume: PUT /v1/grupos-economicos/{id}/roles/{idRol} (TEC-058)
+h3. Componentes impactados
+* Web BELC
+h3. Dependencias
+* TEC-058
+h3. Restricciones
+* Sin reglas de negocio en la pantalla: la API decide. Muestra solo lo que permite el contexto de sesión. Mismo contrato que usará la App.
+h3. Criterios de aceptación técnicos
+* Muestra el aviso de conflicto (409).
+
+_Historia funcional: BELCMW-25_
+_Decisión o bloqueo: Puede iniciar con contratos y mocks de TEC-058; la integración espera que estén terminadas._",historia-tecnica,celula-web,BELCMW-17,BELCMW-25,,,Yesuri Barría,TEC-059
+[TEC-060] Eliminar rol,Historia técnica,"h3. Objetivo técnico
+* Que el administrador dé de baja un rol sin dejar usuarios huérfanos.
+h3. Alcance
+* Incluye: Eliminar rol: endpoint, validaciones y bitácora.
+* No incluye: La pantalla (TEC-061).
+h3. Diseño / arquitectura
+* Endpoint: DELETE /v1/grupos-economicos/{id}/roles/{idRol}
+* Escribe: role (Estado = INACTIVO)
+* Lee: Usuario_grupo_economico, afiliacion
+* Bitácora: ROL_ELIMINADO
+h3. Componentes impactados
+* ms-autogestion
+h3. Dependencias
+* TEC-052
+h3. Restricciones
+* Baja lógica (Estado = INACTIVO), nunca DELETE físico. Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Baja lógica. Si tiene usuarios activos o invitaciones pendientes → 409.
+
+_Historia funcional: BELCMW-26_
+_Decisión o bloqueo: Puede iniciar con contratos y mocks de TEC-052; la integración espera que estén terminadas._",historia-tecnica,celula-be,BELCMW-17,BELCMW-26,,,Edwin Lima,TEC-060
+[TEC-061] Confirmación de eliminación de rol,Historia técnica,"h3. Objetivo técnico
+* Que la baja de un rol se confirme y explique cuando no es posible.
+h3. Alcance
+* Incluye: Pantalla Web: confirmación de eliminación de rol.
+* No incluye: App (otro tablero); el servicio (TEC-060).
+h3. Diseño / arquitectura
+* Consume: DELETE /v1/grupos-economicos/{id}/roles/{idRol} (TEC-060)
+h3. Componentes impactados
+* Web BELC
+h3. Dependencias
+* TEC-060
+h3. Restricciones
+* Sin reglas de negocio en la pantalla: la API decide. Muestra solo lo que permite el contexto de sesión. Mismo contrato que usará la App.
+h3. Criterios de aceptación técnicos
+* Pide confirmación. Si el rol tiene usuarios o invitaciones (409), muestra cuáles y no elimina.
+
+_Historia funcional: BELCMW-26_
+_Decisión o bloqueo: Puede iniciar con contratos y mocks de TEC-060; la integración espera que estén terminadas._",historia-tecnica,celula-web,BELCMW-17,BELCMW-26,,,Yesuri Barría,TEC-061
+[TEC-030] Servicio de listado y búsqueda de usuarios,Historia técnica,"h3. Objetivo técnico
+* Que el administrador consulte los usuarios e invitaciones de su grupo.
+h3. Alcance
+* Incluye: Servicio de listado y búsqueda de usuarios: endpoint, validaciones y bitácora.
+* No incluye: La pantalla (TEC-031).
+h3. Diseño / arquitectura
+* Endpoint: GET /v1/grupos-economicos/{id}/usuarios?texto=&estado=&pagina=
+* Lee: Usuario_grupo_economico, belc_persona_canal, role, Grupo_economico_administrador, afiliacion
+h3. Componentes impactados
+* ms-autogestion · ForgeRock
+h3. Dependencias
+* TEC-004
+h3. Restricciones
+* Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Incluye invitaciones pendientes; las vencidas como INVITACION_VENCIDA. Paginado, máximo 100. Búsqueda por nombre, correo o rol. Otro grupo → 403. Sin llamadas a ForgeRock.
+
+_Historia funcional: BELCMW-9, BELCMW-10_
+_Decisión o bloqueo: Puede iniciar con contratos y mocks de TEC-004; la integración espera que estén terminadas._",historia-tecnica,celula-be,BELCMW-8,BELCMW-9,BELCMW-10,,Raúl Rojas,TEC-030
+[TEC-031] Pantalla de listado y búsqueda de usuarios,Historia técnica,"h3. Objetivo técnico
+* Que el administrador vea y busque los usuarios de su grupo.
+h3. Alcance
+* Incluye: Pantalla Web: pantalla de listado y búsqueda de usuarios.
+* No incluye: App (otro tablero); el servicio (TEC-030).
+h3. Diseño / arquitectura
+* Consume: GET /v1/grupos-economicos/{id}/usuarios?texto=&estado=&pagina= (TEC-030)
+h3. Componentes impactados
+* Web BELC
+h3. Dependencias
+* TEC-030
+h3. Restricciones
+* Sin reglas de negocio en la pantalla: la API decide. Muestra solo lo que permite el contexto de sesión. Mismo contrato que usará la App.
+h3. Criterios de aceptación técnicos
+* Paginado y filtro por nombre, correo, rol y estado. Muestra invitaciones pendientes y vencidas con su etiqueta. Botón Crear solo con permiso. 403 → mensaje sin datos; 504 → reintentar.
+
+_Historia funcional: BELCMW-9, BELCMW-10_
+_Decisión o bloqueo: Puede iniciar con contratos y mocks de TEC-030; la integración espera que estén terminadas._",historia-tecnica,celula-web,BELCMW-8,BELCMW-9,BELCMW-10,,Yariela Espinosa,TEC-031
+[TEC-032] Servicio de invitación de usuario secundario,Historia técnica,"h3. Objetivo técnico
+* Que el administrador invite a un usuario secundario con un rol del grupo.
+h3. Alcance
+* Incluye: Servicio de invitación de usuario secundario: endpoint, validaciones y bitácora.
+* No incluye: La pantalla (TEC-033).
+h3. Diseño / arquitectura
+* Endpoint: POST /v1/grupos-economicos/{id}/usuarios
+* Escribe: afiliacion
+* Lee: role, Tipo_documento, Tipo_visualizacion
+* Bitácora: USUARIO_INVITADO
+h3. Componentes impactados
+* ms-autogestion
+h3. Dependencias
+* TEC-004
+h3. Restricciones
+* Solo se guarda el hash del token. Vence a las 72 h. Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Rol del mismo grupo (FK compuesta). Vencimiento: fecha de envío + 72 h. Guarda solo el hash del token. No duplica una invitación pendiente de la misma persona en el grupo.
+
+_Historia funcional: BELCMW-11_
+_Decisión o bloqueo: D1 · ciclo de vida del enrollment_id_",historia-tecnica,celula-be,BELCMW-8,BELCMW-11,,,Raúl Rojas,TEC-032
+[TEC-033] Formulario de creación de usuario,Historia técnica,"h3. Objetivo técnico
+* Que el administrador invite a un usuario desde la Web.
+h3. Alcance
+* Incluye: Pantalla Web: formulario de creación de usuario.
+* No incluye: App (otro tablero); el servicio (TEC-032).
+h3. Diseño / arquitectura
+* Consume: POST /v1/grupos-economicos/{id}/usuarios (TEC-032)
+h3. Componentes impactados
+* Web BELC
+h3. Dependencias
+* TEC-032
+h3. Restricciones
+* Sin reglas de negocio en la pantalla: la API decide. Muestra solo lo que permite el contexto de sesión. Mismo contrato que usará la App.
+h3. Criterios de aceptación técnicos
+* Rol y tipo de visualización desde la API. Valida documento y correo antes de enviar. Botón deshabilitado mientras envía (evita doble invitación). 409 → 'ya existe una invitación pendiente'.
+
+_Historia funcional: BELCMW-11_
+_Decisión o bloqueo: D1_",historia-tecnica,celula-web,BELCMW-8,BELCMW-11,,,Yariela Espinosa,TEC-033
+[TEC-034] Notificación de invitación y de alta del usuario,Historia técnica,"h3. Objetivo técnico
+* Que el usuario invitado reciba su enlace y, al completar, su aviso de alta.
+h3. Alcance
+* Incluye: Correo de invitación y aviso de alta.
+* No incluye: Notificaciones de transacciones (R2).
+h3. Diseño / arquitectura
+* Endpoint: — (interno)
+* Lee: afiliacion, Contacto_notificacion
+h3. Componentes impactados
+* ms-notificaciones
+h3. Dependencias
+* TEC-015, TEC-032
+h3. Restricciones
+* Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Envía el enlace con enrollment_id y token al correo de la invitación. Tras completar, aviso de bienvenida al correo de la relación.
+
+_Historia funcional: BELCMW-13_
+_Decisión o bloqueo: D9_",historia-tecnica,celula-be,BELCMW-8,BELCMW-13,,,Benjamín Rodríguez,TEC-034
+[TEC-035] Consultar detalle de usuario,Historia técnica,"h3. Objetivo técnico
+* Que el administrador consulte el detalle de un usuario.
+h3. Alcance
+* Incluye: Consultar detalle de usuario: endpoint, validaciones y bitácora.
+* No incluye: La pantalla (TEC-036).
+h3. Diseño / arquitectura
+* Endpoint: GET /v1/grupos-economicos/{id}/usuarios/{idUsuario}
+* Lee: Usuario_grupo_economico, belc_persona_canal, role, perfil, Rol_grupo_producto, Grupo_producto, Contacto_notificacion
+h3. Componentes impactados
+* ms-autogestion
+h3. Dependencias
+* TEC-004
+h3. Restricciones
+* Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Nombre, rol, perfil, grupos de productos, estado, correo de negocio y fecha de alta. Otro grupo → 403.
+
+_Historia funcional: BELCMW-14_
+_Decisión o bloqueo: Puede iniciar con contratos y mocks de TEC-004; la integración espera que estén terminadas._",historia-tecnica,celula-be,BELCMW-8,BELCMW-14,,,Raúl Rojas,TEC-035
+[TEC-036] Pantalla de detalle de usuario,Historia técnica,"h3. Objetivo técnico
+* Que el administrador vea el detalle de un usuario.
+h3. Alcance
+* Incluye: Pantalla Web: pantalla de detalle de usuario.
+* No incluye: App (otro tablero); el servicio (TEC-035).
+h3. Diseño / arquitectura
+* Consume: GET /v1/grupos-economicos/{id}/usuarios/{idUsuario} (TEC-035)
+h3. Componentes impactados
+* Web BELC
+h3. Dependencias
+* TEC-035
+h3. Restricciones
+* Sin reglas de negocio en la pantalla: la API decide. Muestra solo lo que permite el contexto de sesión. Mismo contrato que usará la App.
+h3. Criterios de aceptación técnicos
+* Muestra rol, perfil, grupos de productos, estado, correo de negocio y fecha de alta. Editar e Inactivar visibles solo con permiso. 403/404 → mensaje genérico.
+
+_Historia funcional: BELCMW-14_
+_Decisión o bloqueo: Puede iniciar con contratos y mocks de TEC-035; la integración espera que estén terminadas._",historia-tecnica,celula-web,BELCMW-8,BELCMW-14,,,Yariela Espinosa,TEC-036
+[TEC-037] Editar usuario secundario,Historia técnica,"h3. Objetivo técnico
+* Que el administrador cambie el rol, la visualización o el correo de negocio de un usuario.
+h3. Alcance
+* Incluye: Editar usuario secundario: endpoint, validaciones y bitácora.
+* No incluye: La pantalla (TEC-038).
+h3. Diseño / arquitectura
+* Endpoint: PUT /v1/grupos-economicos/{id}/usuarios/{idUsuario}
+* Escribe: Usuario_grupo_economico, Contacto_notificacion
+* Lee: role
+* Bitácora: USUARIO_EDITADO
+h3. Componentes impactados
+* ms-autogestion
+h3. Dependencias
+* TEC-004, TEC-016
+h3. Restricciones
+* Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Cambiar rol (mismo grupo), tipo de visualización o correo de negocio. Un correo nuevo requiere verificación por OTP. Control de concurrencia con Version (409).
+
+_Historia funcional: BELCMW-15_
+_Decisión o bloqueo: Puede iniciar con contratos y mocks de TEC-004, TEC-016; la integración espera que estén terminadas._",historia-tecnica,celula-be,BELCMW-8,BELCMW-15,,,Raúl Rojas,TEC-037
+[TEC-038] Pantalla de edición de usuario,Historia técnica,"h3. Objetivo técnico
+* Que el administrador edite un usuario desde la Web.
+h3. Alcance
+* Incluye: Pantalla Web: pantalla de edición de usuario.
+* No incluye: App (otro tablero); el servicio (TEC-037).
+h3. Diseño / arquitectura
+* Consume: PUT /v1/grupos-economicos/{id}/usuarios/{idUsuario} (TEC-037)
+h3. Componentes impactados
+* Web BELC
+h3. Dependencias
+* TEC-037
+h3. Restricciones
+* Sin reglas de negocio en la pantalla: la API decide. Muestra solo lo que permite el contexto de sesión. Mismo contrato que usará la App.
+h3. Criterios de aceptación técnicos
+* Muestra el aviso de conflicto si otro administrador lo cambió antes.
+
+_Historia funcional: BELCMW-15_
+_Decisión o bloqueo: Puede iniciar con contratos y mocks de TEC-037; la integración espera que estén terminadas._",historia-tecnica,celula-web,BELCMW-8,BELCMW-15,,,Yariela Espinosa,TEC-038
+[TEC-039] Inactivar usuario secundario,Historia técnica,"h3. Objetivo técnico
+* Que el administrador quite el acceso de un usuario a su grupo.
+h3. Alcance
+* Incluye: Inactivar usuario secundario: endpoint, validaciones y bitácora.
+* No incluye: La pantalla (TEC-040).
+h3. Diseño / arquitectura
+* Endpoint: PATCH /v1/grupos-economicos/{id}/usuarios/{idUsuario}/estado
+* Escribe: Usuario_grupo_economico
+* Lee: Grupo_economico_administrador
+* Bitácora: USUARIO_INACTIVADO
+h3. Componentes impactados
+* ms-autogestion · ForgeRock
+h3. Dependencias
+* TEC-004
+h3. Restricciones
+* No se puede dejar el grupo sin administrador activo. No cambia ForgeRock. Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Solo esa relación pasa a INACTIVO; ForgeRock no cambia. No permite dejar el grupo sin administrador activo.
+
+_Historia funcional: BELCMW-16_
+_Decisión o bloqueo: Puede iniciar con contratos y mocks de TEC-004; la integración espera que estén terminadas._",historia-tecnica,celula-be,BELCMW-8,BELCMW-16,,,Raúl Rojas,TEC-039
+[TEC-040] Confirmación de inactivación,Historia técnica,"h3. Objetivo técnico
+* Que la inactivación se confirme y explique cuando no es posible.
+h3. Alcance
+* Incluye: Pantalla Web: confirmación de inactivación.
+* No incluye: App (otro tablero); el servicio (TEC-039).
+h3. Diseño / arquitectura
+* Consume: PATCH /v1/grupos-economicos/{id}/usuarios/{idUsuario}/estado (TEC-039)
+h3. Componentes impactados
+* Web BELC
+h3. Dependencias
+* TEC-039
+h3. Restricciones
+* Sin reglas de negocio en la pantalla: la API decide. Muestra solo lo que permite el contexto de sesión. Mismo contrato que usará la App.
+h3. Criterios de aceptación técnicos
+* Pide confirmación. Si es el último administrador activo, muestra el rechazo de la API. Al terminar, el listado muestra el estado nuevo.
+
+_Historia funcional: BELCMW-16_
+_Decisión o bloqueo: Puede iniciar con contratos y mocks de TEC-039; la integración espera que estén terminadas._",historia-tecnica,celula-web,BELCMW-8,BELCMW-16,,,Yariela Espinosa,TEC-040
+[TEC-104] Afiliación de usuario secundario sin acceso previo,Historia técnica,"h3. Objetivo técnico
+* Que un usuario secundario sin acceso previo se registre y quede vinculado al grupo.
+h3. Alcance
+* Incluye: Mismo registro que el administrador, sin alta de administrador.
+* No incluye: Invitación (TEC-032).
+h3. Diseño / arquitectura
+* Endpoint: Reutiliza TEC-020 y TEC-022
+* Escribe: afiliacion, belc_persona_canal, Usuario_grupo_economico, Contacto_notificacion
+* Lee: afiliacion
+* Bitácora: AFILIACION_COMPLETADA
+h3. Componentes impactados
+* ms-identidad / ForgeRock
+h3. Dependencias
+* TEC-020, TEC-022, TEC-023
+h3. Restricciones
+* Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Mismo flujo que el administrador (rama 4b), sin crear Grupo_economico_administrador.
+
+_Historia funcional: BELCMW-46_
+_Decisión o bloqueo: Hereda D1 y D2 de TEC-020_",historia-tecnica,celula-be,BELCMW-43,BELCMW-46,,,David Ríos / Gustavo,TEC-104
+[TEC-100] Cambio de contexto dentro de la misma sesión,Historia técnica,"h3. Objetivo técnico
+* Que la persona cambie entre PERSONAL y COMERCIAL en la misma sesión.
+h3. Alcance
+* Incluye: Cambio PERSONAL/COMERCIAL y recálculo de permisos.
+* No incluye: Cambio de grupo económico (TEC-102).
+h3. Diseño / arquitectura
+* Endpoint: POST /v1/sesion/contexto
+* Lee: Usuario_grupo_economico
+* Bitácora: CAMBIO_CONTEXTO
+h3. Componentes impactados
+* ms-identidad
+h3. Dependencias
+* TEC-005
+h3. Restricciones
+* Sin volver a autenticar. El contexto PERSONAL solo si belp_enabled. Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Cambia entre PERSONAL y COMERCIAL sin volver a iniciar sesión. Recalcula permisos.
+
+_Historia funcional: BELCMW-44_
+_Decisión o bloqueo: D8_",historia-tecnica,celula-be,BELCMW-43,BELCMW-44,,,Domingo Camargo,TEC-100
+[TEC-101] Selector de contexto,Historia técnica,"h3. Objetivo técnico
+* Que la persona cambie de contexto desde la Web.
+h3. Alcance
+* Incluye: Pantalla Web: selector de contexto.
+* No incluye: App (otro tablero); el servicio (TEC-100).
+h3. Diseño / arquitectura
+* Consume: POST /v1/sesion/contexto (TEC-100)
+h3. Componentes impactados
+* Web BELC
+h3. Dependencias
+* TEC-100
+h3. Restricciones
+* Sin reglas de negocio en la pantalla: la API decide. Muestra solo lo que permite el contexto de sesión. Mismo contrato que usará la App.
+h3. Criterios de aceptación técnicos
+* Muestra el contexto PERSONAL solo si belp_enabled. Al cambiar, recarga menú y permisos sin pedir login.
+
+_Historia funcional: BELCMW-44_
+_Decisión o bloqueo: D8_",historia-tecnica,celula-web,BELCMW-43,BELCMW-44,,,Allan Bennett,TEC-101
+[TEC-102] Operar con varios grupos económicos,Historia técnica,"h3. Objetivo técnico
+* Que la persona con varios grupos económicos cambie de grupo en la misma sesión.
+h3. Alcance
+* Incluye: Lista de grupos activos y cambio de grupo.
+* No incluye: Cambio de contexto PERSONAL/COMERCIAL (TEC-100).
+h3. Diseño / arquitectura
+* Endpoint: GET y POST /v1/sesion/contexto
+* Lee: Usuario_grupo_economico, Grupo_economico
+* Bitácora: CAMBIO_CONTEXTO
+h3. Componentes impactados
+* ms-identidad
+h3. Dependencias
+* TEC-005
+h3. Restricciones
+* Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* contextosDisponibles lista todos los grupos con relación ACTIVA. Al cambiar de grupo se recalculan rol, permisos y productos sin volver a iniciar sesión.
+
+_Historia funcional: BELCMW-45_
+_Decisión o bloqueo: D1_",historia-tecnica,celula-be,BELCMW-43,BELCMW-45,,,Domingo Camargo,TEC-102
+[TEC-103] Selector de grupo económico,Historia técnica,"h3. Objetivo técnico
+* Que la persona elija su grupo económico desde la Web.
+h3. Alcance
+* Incluye: Pantalla Web: selector de grupo económico.
+* No incluye: App (otro tablero); el servicio (TEC-102).
+h3. Diseño / arquitectura
+* Consume: GET y POST /v1/sesion/contexto (TEC-102)
+h3. Componentes impactados
+* Web BELC
+h3. Dependencias
+* TEC-102
+h3. Restricciones
+* Sin reglas de negocio en la pantalla: la API decide. Muestra solo lo que permite el contexto de sesión. Mismo contrato que usará la App.
+h3. Criterios de aceptación técnicos
+* Lista todos los grupos con relación activa. Al cambiar de grupo, recarga menú, permisos y productos sin pedir login.
+
+_Historia funcional: BELCMW-45_
+_Decisión o bloqueo: D1_",historia-tecnica,celula-web,BELCMW-43,BELCMW-45,,,Allan Bennett,TEC-103
+[TEC-105] Servicio de consolidado de productos con saldo,Historia técnica,"h3. Objetivo técnico
+* Que el usuario vea sus productos con saldo según su rol.
+h3. Alcance
+* Incluye: Productos de los grupos del rol con saldo de COBIS.
+* No incluye: Movimientos y estados de cuenta.
+h3. Diseño / arquitectura
+* Endpoint: GET /v1/grupos-economicos/{id}/productos
+* Lee: Rol_grupo_producto, Grupo_producto, Grupo_producto_detalle, Producto_vinculacion, Empresas_asociadas, Tipo_producto, moneda
+h3. Componentes impactados
+* ms-productos · COBIS
+h3. Dependencias
+* TEC-004, TEC-012
+h3. Restricciones
+* Los saldos no se guardan en BELC. Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Solo productos de los grupos de productos activos del rol, sin repetir. Saldos de COBIS en una sola llamada; no se guardan. COBIS sin respuesta → 504 retryable.
+
+_Historia funcional: BELCMW-47_
+_Decisión o bloqueo: Puede iniciar con contratos y mocks de TEC-004, TEC-012; la integración espera que estén terminadas._",historia-tecnica,celula-be,BELCMW-43,BELCMW-47,,,Raúl Rojas,TEC-105
+[TEC-106] Pantalla del consolidado,Historia técnica,"h3. Objetivo técnico
+* Que el usuario vea el consolidado de productos en la Web.
+h3. Alcance
+* Incluye: Vista del consolidado según Mixto o Separado.
+* No incluye: Detalle de movimientos.
+h3. Diseño / arquitectura
+* Consume: GET /v1/grupos-economicos/{id}/productos (TEC-105)
+h3. Componentes impactados
+* Web BELC
+h3. Dependencias
+* TEC-105
+h3. Restricciones
+* Sin reglas de negocio en la pantalla: la API decide. Muestra solo lo que permite el contexto de sesión. Mismo contrato que usará la App.
+h3. Criterios de aceptación técnicos
+* Agrupación por empresa o mezclada según Mixto o Separado.
+
+_Historia funcional: BELCMW-47_
+_Decisión o bloqueo: D3_",historia-tecnica,celula-web,BELCMW-43,BELCMW-47,,,Allan Bennett,TEC-106
+[TEC-107] Aplicar accesos y productos según el rol en todos los servicios,Historia técnica,"h3. Objetivo técnico
+* Comprobar que todos los servicios aplican el rol: permisos, productos y grupo.
+h3. Alcance
+* Incluye: Pruebas automatizadas de permisos, productos y grupo en todos los endpoints.
+* No incluye: Pruebas funcionales de pantallas.
+h3. Diseño / arquitectura
+* Lee: Rol_permiso, Rol_grupo_producto
+* Bitácora: ACCESO_DENEGADO
+h3. Componentes impactados
+* Todos los microservicios
+h3. Dependencias
+* TEC-004
+h3. Restricciones
+* Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Pruebas automatizadas: sin permiso → 403; producto fuera de los grupos del rol → 403; recurso de otro grupo → 403; acciones solo las que el rol permite.
+
+_Historia funcional: BELCMW-48_
+_Decisión o bloqueo: Puede iniciar con contratos y mocks de TEC-004; la integración espera que estén terminadas._",historia-tecnica,celula-be,BELCMW-43,BELCMW-48,,,Domingo Camargo / Kevin Hawkins / Leyda Batista,TEC-107
+[TEC-080] Listar y buscar flujos de aprobación,Historia técnica,"h3. Objetivo técnico
+* Que el administrador consulte los flujos de aprobación de su grupo.
+h3. Alcance
+* Incluye: Listar y buscar flujos de aprobación: endpoint, validaciones y bitácora.
+* No incluye: La pantalla (TEC-081).
+h3. Diseño / arquitectura
+* Endpoint: GET /v1/grupos-economicos/{id}/flujos-aprobacion?texto=
+* Lee: Flujo_aprobacion, Flujo_aprobacion_regla, Tipo_transaccion, moneda
+h3. Componentes impactados
+* ms-autogestion · COBIS
+h3. Dependencias
+* TEC-004
+h3. Restricciones
+* Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Paginado, filtro por tipo de transacción y moneda. Otro grupo → 403. Sin llamadas a COBIS.
+
+_Historia funcional: BELCMW-35, BELCMW-36_
+_Decisión o bloqueo: D4_",historia-tecnica,celula-be,BELCMW-34,BELCMW-35,BELCMW-36,,David Ríos,TEC-080
+[TEC-081] Pantalla de listado y búsqueda de flujos de aprobación,Historia técnica,"h3. Objetivo técnico
+* Que el administrador vea y busque sus flujos de aprobación.
+h3. Alcance
+* Incluye: Pantalla Web: pantalla de listado y búsqueda de flujos de aprobación.
+* No incluye: App (otro tablero); el servicio (TEC-080).
+h3. Diseño / arquitectura
+* Consume: GET /v1/grupos-economicos/{id}/flujos-aprobacion?texto= (TEC-080)
+h3. Componentes impactados
+* Web BELC
+h3. Dependencias
+* TEC-080
+h3. Restricciones
+* Sin reglas de negocio en la pantalla: la API decide. Muestra solo lo que permite el contexto de sesión. Mismo contrato que usará la App.
+h3. Criterios de aceptación técnicos
+* Lista con tipo de transacción, moneda y rangos. Búsqueda por nombre. Botón Crear solo con permiso.
+
+_Historia funcional: BELCMW-35, BELCMW-36_
+_Decisión o bloqueo: D4_",historia-tecnica,celula-web,BELCMW-34,BELCMW-35,BELCMW-36,,Yariela Espinosa,TEC-081
+[TEC-082] Crear flujo con sus reglas por monto,Historia técnica,"h3. Objetivo técnico
+* Que el administrador defina qué montos requieren aprobación y con qué reglas.
+h3. Alcance
+* Incluye: Flujo, reglas por monto y productos asociados.
+* No incluye: Niveles y aprobadores (TEC-084); ejecución de aprobaciones (R2).
+h3. Diseño / arquitectura
+* Endpoint: POST /v1/grupos-economicos/{id}/flujos-aprobacion
+* Escribe: Flujo_aprobacion, Flujo_aprobacion_regla, Flujo_aprobacion_producto (con id_grupo_economico)
+* Lee: Tipo_transaccion, moneda, Producto_vinculacion
+* Bitácora: FLUJO_CREADO
+h3. Componentes impactados
+* ms-autogestion
+h3. Dependencias
+* TEC-003, TEC-004
+h3. Restricciones
+* Monto desde inclusivo, monto hasta exclusivo. Sin solape por tipo de transacción y moneda. Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Rangos sin solape por tipo de transacción y moneda; desde inclusivo, hasta exclusivo; validado con SELECT … FOR UPDATE. Productos del mismo grupo.
+
+_Historia funcional: BELCMW-37_
+_Decisión o bloqueo: D4_",historia-tecnica,celula-be,BELCMW-34,BELCMW-37,,,David Ríos,TEC-082
+[TEC-083] Pantalla de creación de flujo,Historia técnica,"h3. Objetivo técnico
+* Que el administrador cree un flujo desde la Web.
+h3. Alcance
+* Incluye: Pantalla Web: pantalla de creación de flujo.
+* No incluye: App (otro tablero); el servicio (TEC-082).
+h3. Diseño / arquitectura
+* Consume: POST /v1/grupos-economicos/{id}/flujos-aprobacion (TEC-082)
+h3. Componentes impactados
+* Web BELC
+h3. Dependencias
+* TEC-082
+h3. Restricciones
+* Sin reglas de negocio en la pantalla: la API decide. Muestra solo lo que permite el contexto de sesión. Mismo contrato que usará la App.
+h3. Criterios de aceptación técnicos
+* Valida en pantalla que los rangos no se solapen (la API valida igual). Monto desde inclusivo y hasta exclusivo, explicado en la ayuda.
+
+_Historia funcional: BELCMW-37_
+_Decisión o bloqueo: D4_",historia-tecnica,celula-web,BELCMW-34,BELCMW-37,,,Yariela Espinosa,TEC-083
+[TEC-084] Configurar niveles y aprobadores,Historia técnica,"h3. Objetivo técnico
+* Que cada regla tenga niveles ordenados con sus aprobadores.
+h3. Alcance
+* Incluye: Niveles, aprobadores y cantidad requerida por nivel.
+* No incluye: Ejecución de aprobaciones (R2).
+h3. Diseño / arquitectura
+* Endpoint: PUT /v1/grupos-economicos/{id}/flujos-aprobacion/{idFlujo}/reglas/{idRegla}/niveles
+* Escribe: Flujo_aprobacion_nivel, Flujo_aprobacion_aprobador (con id_grupo_economico)
+* Lee: Usuario_grupo_economico, role, perfil
+* Bitácora: FLUJO_EDITADO
+h3. Componentes impactados
+* ms-autogestion
+h3. Dependencias
+* TEC-082
+h3. Restricciones
+* Aprobadores del mismo grupo y con perfil APROBADOR. Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Orden consecutivo desde 1. Aprobaciones requeridas entre 1 y la cantidad de aprobadores del nivel. Aprobadores del mismo grupo y con perfil APROBADOR. Sube Flujo_aprobacion.Version.
+
+_Historia funcional: BELCMW-38_
+_Decisión o bloqueo: D4_",historia-tecnica,celula-be,BELCMW-34,BELCMW-38,,,David Ríos,TEC-084
+[TEC-085] Pantalla de niveles y aprobadores,Historia técnica,"h3. Objetivo técnico
+* Que el administrador configure niveles y aprobadores desde la Web.
+h3. Alcance
+* Incluye: Pantalla Web: pantalla de niveles y aprobadores.
+* No incluye: App (otro tablero); el servicio (TEC-084).
+h3. Diseño / arquitectura
+* Consume: PUT /v1/grupos-economicos/{id}/flujos-aprobacion/{idFlujo}/reglas/{idRegla}/niveles (TEC-084)
+h3. Componentes impactados
+* Web BELC
+h3. Dependencias
+* TEC-084
+h3. Restricciones
+* Sin reglas de negocio en la pantalla: la API decide. Muestra solo lo que permite el contexto de sesión. Mismo contrato que usará la App.
+h3. Criterios de aceptación técnicos
+* Niveles en orden; por nivel elige aprobadores (solo perfil APROBADOR) y cuántas aprobaciones requiere, entre 1 y la cantidad de aprobadores. Muestra la etiqueta 1/2, 1/1.
+
+_Historia funcional: BELCMW-38_
+_Decisión o bloqueo: D4_",historia-tecnica,celula-web,BELCMW-34,BELCMW-38,,,Yariela Espinosa,TEC-085
+[TEC-086] Consultar detalle de flujo,Historia técnica,"h3. Objetivo técnico
+* Que el administrador consulte un flujo completo.
+h3. Alcance
+* Incluye: Consultar detalle de flujo: endpoint, validaciones y bitácora.
+* No incluye: La pantalla (TEC-087).
+h3. Diseño / arquitectura
+* Endpoint: GET /v1/grupos-economicos/{id}/flujos-aprobacion/{idFlujo}
+* Lee: Flujo_aprobacion y sus reglas, niveles y aprobadores; belc_persona_canal
+h3. Componentes impactados
+* ms-autogestion
+h3. Dependencias
+* TEC-004
+h3. Restricciones
+* Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Formato de tu contrato (paso 4).
+
+_Historia funcional: BELCMW-40_
+_Decisión o bloqueo: D4_",historia-tecnica,celula-be,BELCMW-34,BELCMW-40,,,David Ríos,TEC-086
+[TEC-087] Pantalla de detalle de flujo,Historia técnica,"h3. Objetivo técnico
+* Que el administrador vea el detalle de un flujo.
+h3. Alcance
+* Incluye: Pantalla Web: pantalla de detalle de flujo.
+* No incluye: App (otro tablero); el servicio (TEC-086).
+h3. Diseño / arquitectura
+* Consume: GET /v1/grupos-economicos/{id}/flujos-aprobacion/{idFlujo} (TEC-086)
+h3. Componentes impactados
+* Web BELC
+h3. Dependencias
+* TEC-086
+h3. Restricciones
+* Sin reglas de negocio en la pantalla: la API decide. Muestra solo lo que permite el contexto de sesión. Mismo contrato que usará la App.
+h3. Criterios de aceptación técnicos
+* Muestra reglas, niveles y aprobadores con su nombre. Editar y Eliminar solo con permiso.
+
+_Historia funcional: BELCMW-40_
+_Decisión o bloqueo: D4_",historia-tecnica,celula-web,BELCMW-34,BELCMW-40,,,Yesuri Barría,TEC-087
+[TEC-088] Editar flujo de aprobación,Historia técnica,"h3. Objetivo técnico
+* Que el administrador cambie un flujo sin pisar cambios de otro administrador.
+h3. Alcance
+* Incluye: Editar flujo de aprobación: endpoint, validaciones y bitácora.
+* No incluye: La pantalla (TEC-089).
+h3. Diseño / arquitectura
+* Endpoint: PUT /v1/grupos-economicos/{id}/flujos-aprobacion/{idFlujo}
+* Escribe: Flujo_aprobacion y sus reglas
+* Bitácora: FLUJO_EDITADO
+h3. Componentes impactados
+* ms-autogestion
+h3. Dependencias
+* TEC-082
+h3. Restricciones
+* Concurrencia optimista con Version. Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* UPDATE con WHERE Version (409). Mismas validaciones de rangos que al crear.
+
+_Historia funcional: BELCMW-41_
+_Decisión o bloqueo: D4_",historia-tecnica,celula-be,BELCMW-34,BELCMW-41,,,David Ríos,TEC-088
+[TEC-089] Pantalla de edición de flujo,Historia técnica,"h3. Objetivo técnico
+* Que el administrador edite un flujo desde la Web.
+h3. Alcance
+* Incluye: Pantalla Web: pantalla de edición de flujo.
+* No incluye: App (otro tablero); el servicio (TEC-088).
+h3. Diseño / arquitectura
+* Consume: PUT /v1/grupos-economicos/{id}/flujos-aprobacion/{idFlujo} (TEC-088)
+h3. Componentes impactados
+* Web BELC
+h3. Dependencias
+* TEC-088
+h3. Restricciones
+* Sin reglas de negocio en la pantalla: la API decide. Muestra solo lo que permite el contexto de sesión. Mismo contrato que usará la App.
+h3. Criterios de aceptación técnicos
+* Mismas validaciones que crear. Envía Version; 409 → aviso de conflicto y recarga.
+
+_Historia funcional: BELCMW-41_
+_Decisión o bloqueo: D4_",historia-tecnica,celula-web,BELCMW-34,BELCMW-41,,,Yesuri Barría,TEC-089
+[TEC-090] Eliminar flujo de aprobación,Historia técnica,"h3. Objetivo técnico
+* Que el administrador dé de baja un flujo.
+h3. Alcance
+* Incluye: Baja lógica del flujo.
+* No incluye: Validación de transacciones pendientes hasta el R2.
+h3. Diseño / arquitectura
+* Endpoint: DELETE /v1/grupos-economicos/{id}/flujos-aprobacion/{idFlujo}
+* Escribe: Flujo_aprobacion (Estado = INACTIVO)
+* Bitácora: FLUJO_ELIMINADO
+h3. Componentes impactados
+* ms-autogestion
+h3. Dependencias
+* TEC-082
+h3. Restricciones
+* Baja lógica (Estado = INACTIVO), nunca DELETE físico. Solo datos del grupo económico de la sesión (403 si no). Escribe solo en belc y en auditoria (INSERT). Errores en formato RFC 7807 con correlationId.
+h3. Criterios de aceptación técnicos
+* Baja lógica. Desde el R2, si hay transacciones pendientes con ese flujo → 409.
+
+_Historia funcional: BELCMW-42_
+_Decisión o bloqueo: D4_",historia-tecnica,celula-be,BELCMW-34,BELCMW-42,,,David Ríos,TEC-090
+[TEC-091] Confirmación de eliminación de flujo,Historia técnica,"h3. Objetivo técnico
+* Que la baja de un flujo se confirme y explique cuando no es posible.
+h3. Alcance
+* Incluye: Pantalla Web: confirmación de eliminación de flujo.
+* No incluye: App (otro tablero); el servicio (TEC-090).
+h3. Diseño / arquitectura
+* Consume: DELETE /v1/grupos-economicos/{id}/flujos-aprobacion/{idFlujo} (TEC-090)
+h3. Componentes impactados
+* Web BELC
+h3. Dependencias
+* TEC-090
+h3. Restricciones
+* Sin reglas de negocio en la pantalla: la API decide. Muestra solo lo que permite el contexto de sesión. Mismo contrato que usará la App.
+h3. Criterios de aceptación técnicos
+* Pide confirmación. Desde el R2, si hay transacciones pendientes con el flujo (409), lo informa y no elimina.
+
+_Historia funcional: BELCMW-42_
+_Decisión o bloqueo: D4_",historia-tecnica,celula-web,BELCMW-34,BELCMW-42,,,Yesuri Barría,TEC-091
