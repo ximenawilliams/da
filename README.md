@@ -1,6 +1,4 @@
--- =====================================================================
--- ESQUEMA belc · Banca en Línea Comercial · DDL v4 (Aurora MySQL 3 / MySQL 8.0)
--- Incluye el DDL v2 + correcciones v3 (4.2, 4.3, 4.4, 4.5, 4.7, 4.9, version).
+
 --
 -- Convención de nombres (decisión de arquitectura / DBA):
 --   * Prefijo belpc_ en todas las tablas de banca comercial: soporte identifica
