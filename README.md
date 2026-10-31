@@ -1,4 +1,4 @@
-
+-- Orden de ejecución: primero belc_ddl_v4.sql y después belc_datos_iniciales_v4.sql.
 --
 -- Convención de nombres (decisión de arquitectura / DBA):
 --   * Prefijo belpc_ en todas las tablas de banca comercial: soporte identifica
